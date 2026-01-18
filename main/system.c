@@ -130,7 +130,12 @@ esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
 #if !CONFIG_ESP_MINER_HEADLESS
     ESP_RETURN_ON_ERROR(display_init(GLOBAL_STATE), TAG, "Display init failed!");
 
+    // Long-press toggles configuration SoftAP only when enabled.
+#if defined(CONFIG_ESP_MINER_DISABLE_CONFIG_AP) && CONFIG_ESP_MINER_DISABLE_CONFIG_AP
+    ESP_RETURN_ON_ERROR(input_init(screen_button_press, NULL), TAG, "Input init failed!");
+#else
     ESP_RETURN_ON_ERROR(input_init(screen_button_press, toggle_wifi_softap), TAG, "Input init failed!");
+#endif
 
     ESP_RETURN_ON_ERROR(screen_start(GLOBAL_STATE), TAG, "Screen start failed!");
 #else
