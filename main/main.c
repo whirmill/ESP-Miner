@@ -18,7 +18,9 @@
 #include "nvs_config.h"
 #include "self_test.h"
 #include "asic.h"
+#if !(defined(CONFIG_ESP_MINER_DISABLE_BAP) && CONFIG_ESP_MINER_DISABLE_BAP)
 #include "bap/bap.h"
+#endif
 #include "device_config.h"
 #include "connect.h"
 #include "asic_reset.h"
@@ -108,12 +110,14 @@ void app_main(void)
     // After mounting SPIFFS
     SYSTEM_init_versions(&GLOBAL_STATE);
 
+#if !(defined(CONFIG_ESP_MINER_DISABLE_BAP) && CONFIG_ESP_MINER_DISABLE_BAP)
     // Initialize BAP interface
     esp_err_t bap_ret = BAP_init(&GLOBAL_STATE);
     if (bap_ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize BAP interface: %d", bap_ret);
         // Continue anyway, as BAP is not critical for core functionality
     }
+#endif
 
     while (!GLOBAL_STATE.SYSTEM_MODULE.is_connected) {
         vTaskDelay(100 / portTICK_PERIOD_MS);

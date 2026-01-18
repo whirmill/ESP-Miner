@@ -44,6 +44,17 @@ set(MAIN_SRCS
     "./power/asic_init.c"
 )
 
+if(CONFIG_ESP_MINER_DISABLE_BAP)
+    message(STATUS "Lightweight build: disabling BAP sources")
+    list(REMOVE_ITEM MAIN_SRCS
+        "./bap/bap.c"
+        "./bap/bap_protocol.c"
+        "./bap/bap_uart.c"
+        "./bap/bap_handlers.c"
+        "./bap/bap_subscription.c"
+    )
+endif()
+
 if(CONFIG_ESP_MINER_HEADLESS)
     message(STATUS "Headless build: disabling display/LVGL/screen/input sources")
     list(REMOVE_ITEM MAIN_SRCS

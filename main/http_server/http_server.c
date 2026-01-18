@@ -1390,8 +1390,10 @@ esp_err_t start_rest_server(void * pvParameters)
     };
     httpd_register_uri_handler(server, &recovery_explicit_get_uri);
     
-    // Register theme API endpoints
+    // Theme endpoints are only needed by the AxeOS web UI.
+#if !CONFIG_ESP_MINER_HEADLESS && !CONFIG_ESP_MINER_DISABLE_WEB_UI
     ESP_ERROR_CHECK(register_theme_api_endpoints(server, rest_context));
+#endif
 
     /* URI handler for fetching system info */
     httpd_uri_t system_info_get_uri = {
@@ -1475,6 +1477,7 @@ esp_err_t start_rest_server(void * pvParameters)
     };
     httpd_register_uri_handler(server, &update_post_ota_firmware);
 
+#if !CONFIG_ESP_MINER_HEADLESS && !CONFIG_ESP_MINER_DISABLE_WEB_UI
     httpd_uri_t update_post_ota_www = {
         .uri = "/api/system/OTAWWW", 
         .method = HTTP_POST, 
@@ -1482,6 +1485,7 @@ esp_err_t start_rest_server(void * pvParameters)
         .user_ctx = NULL
     };
     httpd_register_uri_handler(server, &update_post_ota_www);
+#endif
 
     httpd_uri_t ws = {
         .uri = "/api/ws", 
