@@ -1,3 +1,17 @@
+menu "ESP-Miner Build Options"
+
+    config ESP_MINER_HEADLESS
+        bool "Headless build (no display UI, no AxeOS static files)"
+        default n
+        help
+            Build a minimal firmware intended for no-PSRAM targets.
+
+            - Skips display/LVGL/screen/input initialization.
+            - Skips building/serving AxeOS static files (www).
+            - Keeps REST API and WebSocket endpoints for external control apps.
+
+endmenu
+
 menu "Bitaxe Configuration"
 
     menu "GPIO Pin Configuration"
