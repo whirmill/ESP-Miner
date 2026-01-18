@@ -462,11 +462,18 @@ void stratum_task(void * pvParameters)
     tls_mode tls = GLOBAL_STATE->SYSTEM_MODULE.pool_tls;
     char * cert = GLOBAL_STATE->SYSTEM_MODULE.pool_cert;
 
-    STRATUM_V1_initialize_buffer();
+    if (!STRATUM_V1_initialize_buffer()) {
+        ESP_LOGE(TAG, "Failed to allocate Stratum buffer. Retrying...");
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }
     int retry_attempts = 0;
     int retry_critical_attempts = 0;
 
+#if !(defined(CONFIG_ESP_MINER_LIGHTWEIGHT_RAM) && CONFIG_ESP_MINER_LIGHTWEIGHT_RAM)
     xTaskCreateWithCaps(stratum_primary_heartbeat, "stratum primary heartbeat", ESP_MINER_TASK_STACK_SIZE_DEFAULT, pvParameters, 1, NULL, ESP_MINER_TASK_STACK_CAPS);
+#else
+    ESP_LOGI(TAG, "Lightweight RAM mode: disabling stratum primary heartbeat task");
+#endif
 
     ESP_LOGI(TAG, "Opening connection to pool: %s:%d", stratum_url, port);
     while (1) {
