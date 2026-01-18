@@ -441,6 +441,7 @@ static esp_err_t rest_api_common_handler(httpd_req_t * req)
     return res;
 }
 
+#if !CONFIG_ESP_MINER_HEADLESS && !CONFIG_ESP_MINER_DISABLE_WEB_UI
 static bool file_exists(const char *path) {
     struct stat buffer;
     return (stat(path, &buffer) == 0);
@@ -515,6 +516,7 @@ static esp_err_t rest_common_get_handler(httpd_req_t * req)
     httpd_resp_send_chunk(req, NULL, 0);
     return ESP_OK;
 }
+#endif
 
 static esp_err_t handle_options_request(httpd_req_t * req)
 {
