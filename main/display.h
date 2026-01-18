@@ -1,6 +1,7 @@
 #ifndef DISPLAY_H_
 #define DISPLAY_H_
 
+#include <stdbool.h>
 #include <stdint.h>
 #include "esp_err.h"
 
