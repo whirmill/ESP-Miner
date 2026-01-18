@@ -13,7 +13,11 @@
 #include "nvs_config.h"
 
 // Maximum number of access points to scan
+#if defined(CONFIG_ESP_MINER_LIGHTWEIGHT_RAM) && CONFIG_ESP_MINER_LIGHTWEIGHT_RAM
+#define MAX_AP_COUNT 8
+#else
 #define MAX_AP_COUNT 20
+#endif
 
 #if CONFIG_ESP_WPA3_SAE_PWE_HUNT_AND_PECK
 #define ESP_WIFI_SAE_MODE WPA3_SAE_PWE_HUNT_AND_PECK
@@ -188,14 +192,18 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
             }
 
             ESP_LOGI(TAG, "Could not connect to '%.*s' [rssi %d]: reason %d", event->ssid_len, event->ssid, event->rssi, event->reason);
+#if !(defined(CONFIG_ESP_MINER_DISABLE_CONFIG_AP) && CONFIG_ESP_MINER_DISABLE_CONFIG_AP)
             if (clients_connected_to_ap > 0) {
                 ESP_LOGI(TAG, "Client(s) connected to AP, not retrying...");
                 snprintf(GLOBAL_STATE->SYSTEM_MODULE.wifi_status, sizeof(GLOBAL_STATE->SYSTEM_MODULE.wifi_status), "Config AP connected!");
                 return;
             }
+#endif
 
             GLOBAL_STATE->SYSTEM_MODULE.is_connected = false;
+#if !(defined(CONFIG_ESP_MINER_DISABLE_CONFIG_AP) && CONFIG_ESP_MINER_DISABLE_CONFIG_AP)
             wifi_softap_on();
+#endif
 
             snprintf(GLOBAL_STATE->SYSTEM_MODULE.wifi_status, sizeof(GLOBAL_STATE->SYSTEM_MODULE.wifi_status), "%s (Error %d, retry #%d)", get_wifi_reason_string(event->reason), event->reason, s_retry_num);
             ESP_LOGI(TAG, "Wi-Fi status: %s", GLOBAL_STATE->SYSTEM_MODULE.wifi_status);
@@ -326,6 +334,10 @@ static bool is_wifi_operation_allowed(esp_err_t err)
 
 void toggle_wifi_softap(void)
 {
+#if defined(CONFIG_ESP_MINER_DISABLE_CONFIG_AP) && CONFIG_ESP_MINER_DISABLE_CONFIG_AP
+    ESP_LOGI(TAG, "Config AP disabled; ignoring toggle request");
+    return;
+#else
     wifi_mode_t mode = WIFI_MODE_NULL;
     esp_err_t err = esp_wifi_get_mode(&mode);
     if (is_wifi_operation_allowed(err)) {
@@ -337,22 +349,33 @@ void toggle_wifi_softap(void)
             wifi_softap_on();
         }
     }
+#endif
 }
 
 static void wifi_softap_off(void)
 {
+#if defined(CONFIG_ESP_MINER_DISABLE_CONFIG_AP) && CONFIG_ESP_MINER_DISABLE_CONFIG_AP
+    // No AP mode enabled in this variant.
+    return;
+#else
     esp_err_t err = esp_wifi_set_mode(WIFI_MODE_STA);
     if (is_wifi_operation_allowed(err)) {
         ESP_ERROR_CHECK(err);
     }
+#endif
 }
 
 static void wifi_softap_on(void)
 {
+#if defined(CONFIG_ESP_MINER_DISABLE_CONFIG_AP) && CONFIG_ESP_MINER_DISABLE_CONFIG_AP
+    // No AP mode enabled in this variant.
+    return;
+#else
     esp_err_t err = esp_wifi_set_mode(WIFI_MODE_APSTA);
     if (is_wifi_operation_allowed(err)) {
         ESP_ERROR_CHECK(err);
     }
+#endif
 }
 
 /* Initialize wifi station */
@@ -437,10 +460,13 @@ void wifi_init(void * pvParameters)
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
+    /* Initialize AP (optional) */
+#if !(defined(CONFIG_ESP_MINER_DISABLE_CONFIG_AP) && CONFIG_ESP_MINER_DISABLE_CONFIG_AP)
     wifi_softap_on();
-
-    /* Initialize AP */
     wifi_init_softap(GLOBAL_STATE);
+#else
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+#endif
 
     GLOBAL_STATE->SYSTEM_MODULE.ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID);
 

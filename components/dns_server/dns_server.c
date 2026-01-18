@@ -295,9 +295,9 @@ dns_server_handle_t start_dns_server(dns_server_config_t * config)
     memcpy(handle->entry, config->item, config->num_of_entries * sizeof(dns_entry_pair_t));
 
 #if defined(CONFIG_SPIRAM) && CONFIG_SPIRAM
-    xTaskCreateWithCaps(dns_server_task, "dns_server", 8192, handle, 5, &handle->task, MALLOC_CAP_SPIRAM);
+    xTaskCreateWithCaps(dns_server_task, "dns_server", 6144, handle, 5, &handle->task, MALLOC_CAP_SPIRAM);
 #else
-    xTaskCreate(dns_server_task, "dns_server", 4096, handle, 5, &handle->task);
+    xTaskCreate(dns_server_task, "dns_server", 3072, handle, 5, &handle->task);
 #endif
     return handle;
 }

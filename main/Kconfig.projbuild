@@ -29,6 +29,23 @@ menu "ESP-Miner Build Options"
             Currently this limits in-RAM historical metric buffers used for
             graphing (e.g. /api/system/statistics history).
 
+    config ESP_MINER_DISABLE_CONFIG_AP
+        bool "Disable Wi-Fi config AP/captive portal (external control only)"
+        default n
+        help
+            Disable the built-in Wi-Fi configuration access point (SoftAP) and
+            captive-portal DNS redirect used for local setup.
+
+            Intended for setups where:
+            - Wi-Fi credentials are provisioned via flashed config (CSV) and/or
+              an external controller app using REST/WebSocket APIs.
+            - The device should run in STA-only mode to reduce RAM usage.
+
+            Effects:
+            - No SoftAP at boot.
+            - No captive DNS server.
+            - Long-press button will not toggle SoftAP.
+
 endmenu
 
 menu "Bitaxe Configuration"

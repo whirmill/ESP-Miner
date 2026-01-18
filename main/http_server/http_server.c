@@ -1526,9 +1526,11 @@ esp_err_t start_rest_server(void * pvParameters)
     // Start websocket log handler thread
     xTaskCreateWithCaps(websocket_task, "websocket_task", ESP_MINER_TASK_STACK_SIZE_DEFAULT, server, 2, NULL, ESP_MINER_TASK_STACK_CAPS);
 
-    // Start the DNS server that will redirect all queries to the softAP IP
+    // Start the DNS server that will redirect all queries to the softAP IP (captive portal).
+#if !(defined(CONFIG_ESP_MINER_DISABLE_CONFIG_AP) && CONFIG_ESP_MINER_DISABLE_CONFIG_AP)
     dns_server_config_t dns_config = DNS_SERVER_CONFIG_SINGLE("*" /* all A queries */, "WIFI_AP_DEF" /* softAP netif ID */);
     start_dns_server(&dns_config);
+#endif
 
     return ESP_OK;
 err_start:
