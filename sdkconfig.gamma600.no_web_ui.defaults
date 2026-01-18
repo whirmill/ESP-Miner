@@ -1,0 +1,7 @@
+# Gamma 600 (no PSRAM) - keep display UI, disable AxeOS web dashboard.
+#
+# Use via:
+#   idf.py -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.gamma600.defaults;sdkconfig.gamma600.ipv6.defaults;sdkconfig.gamma600.no_web_ui.defaults" build
+#
+CONFIG_ESP_MINER_DISABLE_WEB_UI=y
+

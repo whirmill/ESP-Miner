@@ -10,6 +10,16 @@ menu "ESP-Miner Build Options"
             - Skips building/serving AxeOS static files (www).
             - Keeps REST API and WebSocket endpoints for external control apps.
 
+    config ESP_MINER_DISABLE_WEB_UI
+        bool "Disable AxeOS web UI (keep display UI)"
+        default n
+        help
+            Disable building and serving the AxeOS static web dashboard.
+
+            - Keeps display/LVGL/screen/input initialization.
+            - Keeps REST API and WebSocket endpoints for external control apps.
+            - Generates a minimal 'www' SPIFFS image so flashing layout stays unchanged.
+
 endmenu
 
 menu "Bitaxe Configuration"

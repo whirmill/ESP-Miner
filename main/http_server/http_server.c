@@ -1305,6 +1305,8 @@ esp_err_t start_rest_server(void * pvParameters)
     bool enter_recovery = false;
 #if CONFIG_ESP_MINER_HEADLESS
     strcpy(axeOSVersion, "headless");
+#elif CONFIG_ESP_MINER_DISABLE_WEB_UI
+    strcpy(axeOSVersion, "disabled");
 #else
     if (init_fs() != ESP_OK) {
         // Unable to initialize the web app filesystem.
@@ -1473,7 +1475,7 @@ esp_err_t start_rest_server(void * pvParameters)
             .user_ctx = rest_context
         };
         httpd_register_uri_handler(server, &api_common_uri);
-#if !CONFIG_ESP_MINER_HEADLESS
+#if !CONFIG_ESP_MINER_HEADLESS && !CONFIG_ESP_MINER_DISABLE_WEB_UI
         /* URI handler for getting web server files */
         httpd_uri_t common_get_uri = {
             .uri = "/*",
