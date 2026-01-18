@@ -1294,6 +1294,18 @@ esp_err_t http_404_error_handler(httpd_req_t * req, httpd_err_code_t err)
     return ESP_OK;
 }
 
+#if CONFIG_ESP_MINER_HEADLESS || CONFIG_ESP_MINER_DISABLE_WEB_UI
+static esp_err_t GET_root_minimal(httpd_req_t * req)
+{
+    httpd_resp_set_type(req, "text/plain");
+    httpd_resp_sendstr(req,
+        "AxeOS web UI is disabled in this firmware build.\n"
+        "Use the REST API under /api/* and the WebSocket at /api/ws.\n"
+    );
+    return ESP_OK;
+}
+#endif
+
 esp_err_t start_rest_server(void * pvParameters)
 {
     GLOBAL_STATE = (GlobalState *) pvParameters;
@@ -1347,6 +1359,15 @@ esp_err_t start_rest_server(void * pvParameters)
         .user_ctx = NULL
     };
     httpd_register_uri_handler(server, &api_options_uri);
+#if CONFIG_ESP_MINER_HEADLESS || CONFIG_ESP_MINER_DISABLE_WEB_UI
+    httpd_uri_t root_minimal_uri = {
+        .uri = "/",
+        .method = HTTP_GET,
+        .handler = GET_root_minimal,
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &root_minimal_uri);
+#endif
 
     httpd_uri_t recovery_explicit_get_uri = {
         .uri = "/recovery", 
