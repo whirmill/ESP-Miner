@@ -7,6 +7,8 @@
 #include <sys/stat.h>
 #include <esp_heap_caps.h>
 
+#include "sdkconfig.h"
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
@@ -1277,11 +1279,15 @@ esp_err_t start_rest_server(void * pvParameters)
     const char * base_path = "";
 
     bool enter_recovery = false;
+#if CONFIG_ESP_MINER_HEADLESS
+    strcpy(axeOSVersion, "headless");
+#else
     if (init_fs() != ESP_OK) {
         // Unable to initialize the web app filesystem.
         // Enter recovery mode
         enter_recovery = true;
     }
+#endif
 
     REST_CHECK(base_path, "wrong base path", err);
     rest_server_context_t * rest_context = calloc(1, sizeof(rest_server_context_t));
@@ -1291,11 +1297,20 @@ esp_err_t start_rest_server(void * pvParameters)
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.uri_match_fn = httpd_uri_match_wildcard;
     config.stack_size = 8192;
-    config.max_open_sockets = 20;
+    // Keep this <= CONFIG_LWIP_MAX_SOCKETS (and leave some headroom for other sockets)
+    int max_open_sockets = 20;
+#ifdef CONFIG_LWIP_MAX_SOCKETS
+    max_open_sockets = MIN(max_open_sockets, (int)CONFIG_LWIP_MAX_SOCKETS - 4);
+#endif
+    if (max_open_sockets < 4) {
+        max_open_sockets = 4;
+    }
+    config.max_open_sockets = max_open_sockets;
     config.max_uri_handlers = 20;
     config.close_fn = websocket_close_fn;
     config.lru_purge_enable = true;
 
+    ESP_LOGI(TAG, "HTTP Server config: max_open_sockets=%d stack_size=%d", config.max_open_sockets, config.stack_size);
     ESP_LOGI(TAG, "Starting HTTP Server");
     REST_CHECK(httpd_start(&server, &config) == ESP_OK, "Start server failed", err_start);
 
@@ -1434,14 +1449,16 @@ esp_err_t start_rest_server(void * pvParameters)
             .user_ctx = rest_context
         };
         httpd_register_uri_handler(server, &api_common_uri);
+#if !CONFIG_ESP_MINER_HEADLESS
         /* URI handler for getting web server files */
         httpd_uri_t common_get_uri = {
-            .uri = "/*", 
-            .method = HTTP_GET, 
-            .handler = rest_common_get_handler, 
+            .uri = "/*",
+            .method = HTTP_GET,
+            .handler = rest_common_get_handler,
             .user_ctx = rest_context
         };
         httpd_register_uri_handler(server, &common_get_uri);
+#endif
     }
 
     httpd_register_err_handler(server, HTTPD_404_NOT_FOUND, http_404_error_handler);

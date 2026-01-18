@@ -1,0 +1,10 @@
+# Gamma 600 (no PSRAM) - optional RAM tuning overrides.
+#
+# Include this file only if you need additional RAM savings.
+#
+# Use via:
+#   idf.py -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.gamma600.defaults;sdkconfig.gamma600.ram_tuning.defaults" build
+#
+CONFIG_LWIP_MAX_SOCKETS=16
+CONFIG_MBEDTLS_SSL_PROTO_TLS1_3=n
+

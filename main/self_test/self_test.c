@@ -6,22 +6,25 @@
 
 #include "esp_log.h"
 #include "esp_timer.h"
+#include "sdkconfig.h"
 
 #include "DS4432U.h"
 #include "TPS546.h"
 #include "adc.h"
+#if !CONFIG_ESP_MINER_HEADLESS
 #include "display.h"
+#include "input.h"
+#include "screen.h"
+#endif
 #if defined(CONFIG_SPIRAM) && CONFIG_SPIRAM
 #include "esp_psram.h"
 #endif
 #include "global_state.h"
 #include "i2c_bitaxe.h"
-#include "input.h"
 #include "nvs_config.h"
 #include "nvs_flash.h"
 #include "power.h"
 #include "power_management_task.h"
-#include "screen.h"
 #include "thermal.h"
 #include "utils.h"
 #include "vcore.h"
@@ -145,6 +148,11 @@ static esp_err_t test_core_voltage(GlobalState * GLOBAL_STATE)
 
 esp_err_t test_display(GlobalState * GLOBAL_STATE)
 {
+#if CONFIG_ESP_MINER_HEADLESS
+    (void)GLOBAL_STATE;
+    ESP_LOGI(TAG, "Headless build: skipping display test");
+    return ESP_OK;
+#else
     // Display testing
     if (display_init(GLOBAL_STATE) != ESP_OK) {
         display_msg("DISPLAY:FAIL", GLOBAL_STATE);
@@ -158,10 +166,16 @@ esp_err_t test_display(GlobalState * GLOBAL_STATE)
     }
 
     return ESP_OK;
+#endif
 }
 
 esp_err_t test_input(GlobalState * GLOBAL_STATE)
 {
+#if CONFIG_ESP_MINER_HEADLESS
+    (void)GLOBAL_STATE;
+    ESP_LOGI(TAG, "Headless build: skipping input test");
+    return ESP_OK;
+#else
     // Input testing
     if (input_init(NULL, reset_self_test) != ESP_OK) {
         display_msg("INPUT:FAIL", GLOBAL_STATE);
@@ -171,10 +185,16 @@ esp_err_t test_input(GlobalState * GLOBAL_STATE)
     ESP_LOGI(TAG, "INPUT init success!");
 
     return ESP_OK;
+#endif
 }
 
 esp_err_t test_screen(GlobalState * GLOBAL_STATE)
 {
+#if CONFIG_ESP_MINER_HEADLESS
+    (void)GLOBAL_STATE;
+    ESP_LOGI(TAG, "Headless build: skipping screen test");
+    return ESP_OK;
+#else
     // Screen testing
     if (screen_start(GLOBAL_STATE) != ESP_OK) {
         display_msg("SCREEN:FAIL", GLOBAL_STATE);
@@ -184,6 +204,7 @@ esp_err_t test_screen(GlobalState * GLOBAL_STATE)
     ESP_LOGI(TAG, "SCREEN start success!");
 
     return ESP_OK;
+#endif
 }
 
 esp_err_t init_voltage_regulator(GlobalState * GLOBAL_STATE)

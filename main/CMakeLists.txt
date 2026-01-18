@@ -1,10 +1,10 @@
-idf_component_register(
-SRCS
+set(MAIN_SRCS
     "adc.c"
     "i2c_bitaxe.c"
     "main.c"
     "nvs_config.c"
     "display.c"
+    "display_config.c"
     "screen.c"
     "input.c"
     "system.c"
@@ -42,6 +42,21 @@ SRCS
     "./power/vcore.c"
     "./power/asic_reset.c"
     "./power/asic_init.c"
+)
+
+if(CONFIG_ESP_MINER_HEADLESS)
+    message(STATUS "Headless build: disabling display/LVGL/screen/input sources")
+    list(REMOVE_ITEM MAIN_SRCS
+        "display.c"
+        "screen.c"
+        "input.c"
+        "lv_font_portfolio-6x8.c"
+        "logo.c"
+    )
+endif()
+
+idf_component_register(
+SRCS ${MAIN_SRCS}
 
 INCLUDE_DIRS
     "."
@@ -83,7 +98,13 @@ idf_build_set_property(COMPILE_OPTIONS "-DLV_CONF_PATH=\"${CMAKE_SOURCE_DIR}/mai
 
 set(WEB_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/http_server/axe-os")
 
-if("$ENV{GITHUB_ACTIONS}" STREQUAL "true")
+if(CONFIG_ESP_MINER_HEADLESS)
+    message(STATUS "Headless build: skipping web UI build; generating minimal www filesystem")
+    set(WEB_HEADLESS_DIR "${CMAKE_BINARY_DIR}/dist-headless/axe-os")
+    file(MAKE_DIRECTORY "${WEB_HEADLESS_DIR}")
+    file(WRITE "${WEB_HEADLESS_DIR}/version.txt" "headless\n")
+    spiffs_create_partition_image(www ${WEB_HEADLESS_DIR} FLASH_IN_PROJECT)
+elseif("$ENV{GITHUB_ACTIONS}" STREQUAL "true")
     message(STATUS "Running on GitHub Actions. Web ui will be prebuilt.")
 
     spiffs_create_partition_image(www ${WEB_SRC_DIR}/dist/axe-os FLASH_IN_PROJECT)
