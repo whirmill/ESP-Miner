@@ -20,6 +20,15 @@ menu "ESP-Miner Build Options"
             - Keeps REST API and WebSocket endpoints for external control apps.
             - Generates a minimal 'www' SPIFFS image so flashing layout stays unchanged.
 
+    config ESP_MINER_LIGHTWEIGHT_RAM
+        bool "Lightweight RAM mode (reduce historical buffers)"
+        default n
+        help
+            Reduce runtime RAM footprint for no-PSRAM targets.
+
+            Currently this limits in-RAM historical metric buffers used for
+            graphing (e.g. /api/system/statistics history).
+
 endmenu
 
 menu "Bitaxe Configuration"
