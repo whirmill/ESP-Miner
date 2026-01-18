@@ -11,7 +11,9 @@
 #include "TPS546.h"
 #include "adc.h"
 #include "display.h"
+#if defined(CONFIG_SPIRAM) && CONFIG_SPIRAM
 #include "esp_psram.h"
+#endif
 #include "global_state.h"
 #include "i2c_bitaxe.h"
 #include "input.h"
@@ -247,11 +249,15 @@ esp_err_t test_init_peripherals(GlobalState * GLOBAL_STATE)
 
 esp_err_t test_psram(GlobalState * GLOBAL_STATE)
 {
+#if defined(CONFIG_SPIRAM) && CONFIG_SPIRAM
     if (!esp_psram_is_initialized()) {
         ESP_LOGE(TAG, "No PSRAM available on ESP32!");
         display_msg("PSRAM:FAIL", GLOBAL_STATE);
         return ESP_FAIL;
     }
+#else
+    (void)GLOBAL_STATE;
+#endif
     return ESP_OK;
 }
 

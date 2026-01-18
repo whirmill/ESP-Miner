@@ -1,6 +1,8 @@
 #ifndef LV_CONF_H
 #define LV_CONF_H
 
+#include "sdkconfig.h"
+
 #define LV_USE_LOG 1
 #define LV_LOG_LEVEL LV_LOG_LEVEL_WARN
 
@@ -73,6 +75,10 @@
 #define LV_BUILD_DEMOS    0
 
 #define LV_MEM_POOL_INCLUDE     "esp_heap_caps.h"
-#define LV_MEM_POOL_ALLOC(size) heap_caps_malloc(size, MALLOC_CAP_SPIRAM | MALLOC_CAP_DMA)
+#if defined(CONFIG_SPIRAM) && CONFIG_SPIRAM
+#define LV_MEM_POOL_ALLOC(size) heap_caps_malloc(size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)
+#else
+#define LV_MEM_POOL_ALLOC(size) heap_caps_malloc(size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)
+#endif
 
 #endif /* LV_CONF_H */

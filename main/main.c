@@ -1,6 +1,8 @@
 #include "esp_event.h"
 #include "esp_log.h"
+#if defined(CONFIG_SPIRAM) && CONFIG_SPIRAM
 #include "esp_psram.h"
+#endif
 
 #include "asic_result_task.h"
 #include "create_jobs_task.h"
@@ -22,6 +24,8 @@
 #include "asic_reset.h"
 #include "asic_init.h"
 
+#include "esp_miner_caps.h"
+
 static GlobalState GLOBAL_STATE;
 
 static const char * TAG = "bitaxe";
@@ -30,12 +34,14 @@ void app_main(void)
 {
     ESP_LOGI(TAG, "Welcome to the bitaxe - FOSS || GTFO!");
 
-    if (!esp_psram_is_initialized()) {
+#if defined(CONFIG_SPIRAM) && CONFIG_SPIRAM
+    GLOBAL_STATE.psram_is_available = esp_psram_is_initialized();
+    if (!GLOBAL_STATE.psram_is_available) {
         ESP_LOGE(TAG, "No PSRAM available on ESP32 device!");
-        GLOBAL_STATE.psram_is_available = false;
-    } else {
-        GLOBAL_STATE.psram_is_available = true;
     }
+#else
+    GLOBAL_STATE.psram_is_available = false;
+#endif
 
     // Init I2C
     ESP_ERROR_CHECK(i2c_bitaxe_init());
@@ -116,10 +122,10 @@ void app_main(void)
     if (xTaskCreate(ASIC_result_task, "asic result", 8192, (void *) &GLOBAL_STATE, 15, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Error creating asic result task");
     }
-    if (xTaskCreateWithCaps(hashrate_monitor_task, "hashrate monitor", 8192, (void *) &GLOBAL_STATE, 5, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
+    if (xTaskCreateWithCaps(hashrate_monitor_task, "hashrate monitor", ESP_MINER_TASK_STACK_SIZE_DEFAULT, (void *) &GLOBAL_STATE, 5, NULL, ESP_MINER_TASK_STACK_CAPS) != pdPASS) {
         ESP_LOGE(TAG, "Error creating hashrate monitor task");
     }
-    if (xTaskCreateWithCaps(statistics_task, "statistics", 8192, (void *) &GLOBAL_STATE, 3, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
+    if (xTaskCreateWithCaps(statistics_task, "statistics", ESP_MINER_TASK_STACK_SIZE_DEFAULT, (void *) &GLOBAL_STATE, 3, NULL, ESP_MINER_TASK_STACK_CAPS) != pdPASS) {
         ESP_LOGE(TAG, "Error creating statistics task");
     }
 }

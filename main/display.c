@@ -11,6 +11,7 @@
 #include "lvgl.h"
 #include "lvgl__lvgl/src/themes/lv_theme_private.h"
 #include "esp_lvgl_port.h"
+#include "esp_miner_caps.h"
 #include "global_state.h"
 #include "nvs_config.h"
 #include "i2c_bitaxe.h"
@@ -93,7 +94,7 @@ esp_err_t display_init(void * pvParameters)
 
     lvgl_port_cfg_t lvgl_cfg = ESP_LVGL_PORT_INIT_CONFIG();
 
-    lvgl_cfg.task_stack_caps = MALLOC_CAP_SPIRAM;
+    lvgl_cfg.task_stack_caps = ESP_MINER_TASK_STACK_CAPS;
 
     if (GLOBAL_STATE->DISPLAY_CONFIG.display == NONE) {
         ESP_LOGI(TAG, "Initialize LVGL");

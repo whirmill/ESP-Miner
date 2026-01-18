@@ -7,6 +7,8 @@
 #include <inttypes.h>
 #include <sys/param.h>
 
+#include "sdkconfig.h"
+
 #include "esp_check.h"
 #include "esp_log.h"
 #include "esp_netif.h"
@@ -14,6 +16,7 @@
 
 #include "dns_server.h"
 #include "lwip/err.h"
+#include "lwip/inet.h"
 #include "lwip/netdb.h"
 #include "lwip/sockets.h"
 #include "lwip/sys.h"
@@ -232,7 +235,7 @@ void dns_server_task(void * pvParameters)
 
         while (handle->started) {
             ESP_LOGI(TAG, "Waiting for data");
-            struct sockaddr_in6 source_addr; // Large enough for both IPv4 or IPv6
+            struct sockaddr_storage source_addr;
             socklen_t socklen = sizeof(source_addr);
             int len = recvfrom(sock, rx_buffer, sizeof(rx_buffer) - 1, 0, (struct sockaddr *) &source_addr, &socklen);
 
@@ -245,11 +248,14 @@ void dns_server_task(void * pvParameters)
             // Data received
             else {
                 // Get the sender's ip address as string
-                if (source_addr.sin6_family == PF_INET) {
-                    inet_ntoa_r(((struct sockaddr_in *) &source_addr)->sin_addr.s_addr, addr_str, sizeof(addr_str) - 1);
-                } else if (source_addr.sin6_family == PF_INET6) {
-                    inet6_ntoa_r(source_addr.sin6_addr, addr_str, sizeof(addr_str) - 1);
+                if (source_addr.ss_family == PF_INET) {
+                    inet_ntoa_r(((struct sockaddr_in *)&source_addr)->sin_addr, addr_str, sizeof(addr_str) - 1);
                 }
+#if CONFIG_LWIP_IPV6
+                else if (source_addr.ss_family == PF_INET6) {
+                    inet6_ntoa_r(((struct sockaddr_in6 *)&source_addr)->sin6_addr, addr_str, sizeof(addr_str) - 1);
+                }
+#endif
 
                 // Null-terminate whatever we received and treat like a string...
                 rx_buffer[len] = 0;
@@ -261,7 +267,7 @@ void dns_server_task(void * pvParameters)
                 if (reply_len <= 0) {
                     ESP_LOGE(TAG, "Failed to prepare a DNS reply");
                 } else {
-                    int err = sendto(sock, reply, reply_len, 0, (struct sockaddr *) &source_addr, sizeof(source_addr));
+                    int err = sendto(sock, reply, reply_len, 0, (struct sockaddr *) &source_addr, socklen);
                     if (err < 0) {
                         ESP_LOGE(TAG, "Error occurred during sending: errno %d", errno);
                         break;
@@ -288,7 +294,11 @@ dns_server_handle_t start_dns_server(dns_server_config_t * config)
     handle->num_of_entries = config->num_of_entries;
     memcpy(handle->entry, config->item, config->num_of_entries * sizeof(dns_entry_pair_t));
 
+#if defined(CONFIG_SPIRAM) && CONFIG_SPIRAM
     xTaskCreateWithCaps(dns_server_task, "dns_server", 8192, handle, 5, &handle->task, MALLOC_CAP_SPIRAM);
+#else
+    xTaskCreate(dns_server_task, "dns_server", 4096, handle, 5, &handle->task);
+#endif
     return handle;
 }
 

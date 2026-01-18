@@ -10,6 +10,7 @@
 #include "nvs_config.h"
 #include "connect.h"
 #include "bm1370.h"
+#include "esp_miner_caps.h"
 
 #define DEFAULT_POLL_RATE 5000
 
@@ -20,7 +21,11 @@ static uint16_t statisticsDataStart;
 static uint16_t statisticsDataSize;
 static pthread_mutex_t statisticsDataLock = PTHREAD_MUTEX_INITIALIZER;
 
+#if defined(CONFIG_SPIRAM) && CONFIG_SPIRAM
 static const uint16_t maxDataCount = 720;
+#else
+static const uint16_t maxDataCount = 180;
+#endif
 
 void createStatisticsBuffer()
 {
@@ -28,7 +33,7 @@ void createStatisticsBuffer()
         pthread_mutex_lock(&statisticsDataLock);
 
         if (NULL == statisticsBuffer) {
-            statisticsBuffer = (StatisticsDataPtr)heap_caps_malloc(sizeof(struct StatisticsData) * maxDataCount, MALLOC_CAP_SPIRAM);
+            statisticsBuffer = (StatisticsDataPtr)heap_caps_malloc(sizeof(struct StatisticsData) * maxDataCount, ESP_MINER_HEAP_ALLOC_CAPS);
             if (NULL == statisticsBuffer) {
                 ESP_LOGW(TAG, "Not enough memory for the statistics data buffer!");
             }

@@ -8,6 +8,8 @@
 #include "freertos/queue.h"
 #include "freertos/task.h"
 #include "esp_log.h"
+
+#include "esp_miner_caps.h"
 #include "esp_http_server.h"
 #include "websocket.h"
 #include "http_server.h"
@@ -200,7 +202,7 @@ void websocket_task(void *pvParameters)
     ESP_LOGI(TAG, "websocket_task starting");
     httpd_handle_t https_handle = (httpd_handle_t)pvParameters;
 
-    log_queue = xQueueCreateWithCaps(MESSAGE_QUEUE_SIZE, sizeof(char*), MALLOC_CAP_SPIRAM);
+    log_queue = xQueueCreateWithCaps(MESSAGE_QUEUE_SIZE, sizeof(char*), ESP_MINER_HEAP_ALLOC_CAPS);
     if (log_queue == NULL) {
         ESP_LOGE(TAG, "Error creating queue");
         vTaskDelete(NULL);

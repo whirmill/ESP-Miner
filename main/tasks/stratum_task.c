@@ -11,9 +11,12 @@
 #include <sys/time.h>
 #include <stdbool.h>
 #include <string.h>
+#include <errno.h>
 #include "utils.h"
 #include "coinbase_decoder.h"
 #include <esp_heap_caps.h>
+
+#include "esp_miner_caps.h"
 
 #define MAX_RETRY_ATTEMPTS 3
 #define MAX_CRITICAL_RETRY_ATTEMPTS 5
@@ -62,7 +65,7 @@ typedef struct {
     socklen_t addrlen;
     int addr_family;
     int ip_protocol;
-    char host_ip[INET6_ADDRSTRLEN + 16];  // IPv6 address + zone identifier (e.g., "fe80::1%wlan0")
+    char host_ip[64];
 } stratum_connection_info_t;
 
 static esp_err_t resolve_stratum_address(const char *hostname, uint16_t port, stratum_connection_info_t *conn_info)
@@ -82,14 +85,18 @@ static esp_err_t resolve_stratum_address(const char *hostname, uint16_t port, st
     ESP_LOGD(TAG, "Resolving address for %s:%u", hostname, port);
 
     struct addrinfo hints = {
+#if CONFIG_LWIP_IPV6
         .ai_family   = AF_UNSPEC,
+#else
+        .ai_family   = AF_INET,
+#endif
         .ai_socktype = SOCK_STREAM,
         .ai_protocol = IPPROTO_TCP,
         .ai_flags    = AI_NUMERICSERV
     };
 
     struct addrinfo *res = NULL;
-    int gai_err = esp_getaddrinfo(hostname, port_str, &hints, &res);
+    int gai_err = getaddrinfo(hostname, port_str, &hints, &res);
     if (gai_err != 0 || res == NULL) {
         ESP_LOGE(TAG, "DNS resolution failed for %s:%u (error: %d)", hostname, port, gai_err);
         return ESP_ERR_NOT_FOUND;
@@ -99,11 +106,12 @@ static esp_err_t resolve_stratum_address(const char *hostname, uint16_t port, st
     memset(conn_info, 0, sizeof(*conn_info));
     conn_info->addr_family = AF_UNSPEC;
 
+    const struct addrinfo *selected = NULL;
+
+#if CONFIG_LWIP_IPV6
     // Preferred order: IPv4 first, then IPv6
     const int preferred_families[] = { AF_INET, AF_INET6 };
     const size_t num_families = sizeof(preferred_families) / sizeof(preferred_families[0]);
-
-    const struct addrinfo *selected = NULL;
 
     for (size_t i = 0; i < num_families && selected == NULL; i++) {
         int family = preferred_families[i];
@@ -115,9 +123,17 @@ static esp_err_t resolve_stratum_address(const char *hostname, uint16_t port, st
             }
         }
     }
+#else
+    for (const struct addrinfo *p = res; p != NULL; p = p->ai_next) {
+        if (p->ai_family == AF_INET) {
+            selected = p;
+            break;
+        }
+    }
+#endif
 
     if (selected == NULL) {
-        ESP_LOGE(TAG, "No supported address family (IPv4 or IPv6) found for %s", hostname);
+        ESP_LOGE(TAG, "No supported address family found for %s", hostname);
         freeaddrinfo(res);
         return ESP_ERR_NOT_SUPPORTED;
     }
@@ -126,9 +142,15 @@ static esp_err_t resolve_stratum_address(const char *hostname, uint16_t port, st
     memcpy(&conn_info->dest_addr, selected->ai_addr, selected->ai_addrlen);
     conn_info->addrlen     = selected->ai_addrlen;
     conn_info->addr_family = selected->ai_family;
-    conn_info->ip_protocol = (selected->ai_family == AF_INET) ? IPPROTO_IP : IPPROTO_IPV6;
+    conn_info->ip_protocol = IPPROTO_IP;
+#if CONFIG_LWIP_IPV6
+    if (selected->ai_family == AF_INET6) {
+        conn_info->ip_protocol = IPPROTO_IPV6;
+    }
+#endif
 
     // Handle IPv6 link-local scope ID if needed
+#if CONFIG_LWIP_IPV6
     if (selected->ai_family == AF_INET6) {
         struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *)&conn_info->dest_addr;
 
@@ -153,6 +175,7 @@ static esp_err_t resolve_stratum_address(const char *hostname, uint16_t port, st
             }
         }
     }
+#endif
 
     // Convert resolved address to string for logging and storage
     const void *src_addr;
@@ -161,16 +184,26 @@ static esp_err_t resolve_stratum_address(const char *hostname, uint16_t port, st
     if (af == AF_INET) {
         struct sockaddr_in *addr4 = (struct sockaddr_in *)&conn_info->dest_addr;
         src_addr = &addr4->sin_addr;
-    } else {
+    }
+#if CONFIG_LWIP_IPV6
+    else {
         struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *)&conn_info->dest_addr;
         src_addr = &addr6->sin6_addr;
     }
+#else
+    else {
+        freeaddrinfo(res);
+        return ESP_ERR_NOT_SUPPORTED;
+    }
+#endif
 
     if (inet_ntop(af, src_addr, conn_info->host_ip, sizeof(conn_info->host_ip)) == NULL) {
         ESP_LOGW(TAG, "inet_ntop failed (errno: %d)", errno);
         snprintf(conn_info->host_ip, sizeof(conn_info->host_ip), "[invalid %s addr]",
                  (af == AF_INET) ? "IPv4" : "IPv6");
-    } else if (af == AF_INET6) {
+    }
+#if CONFIG_LWIP_IPV6
+    else if (af == AF_INET6) {
         struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *)&conn_info->dest_addr;
         if (IN6_IS_ADDR_LINKLOCAL(&addr6->sin6_addr) && addr6->sin6_scope_id != 0) {
             char zone[16];
@@ -181,6 +214,7 @@ static esp_err_t resolve_stratum_address(const char *hostname, uint16_t port, st
             conn_info->host_ip[sizeof(conn_info->host_ip) - 1] = '\0';
         }
     }
+#endif
 
     ESP_LOGI(TAG, "Resolved %s:%u → %s", hostname, port, conn_info->host_ip);
 
@@ -426,7 +460,7 @@ void stratum_task(void * pvParameters)
     int retry_attempts = 0;
     int retry_critical_attempts = 0;
 
-    xTaskCreateWithCaps(stratum_primary_heartbeat, "stratum primary heartbeat", 8192, pvParameters, 1, NULL, MALLOC_CAP_SPIRAM);
+    xTaskCreateWithCaps(stratum_primary_heartbeat, "stratum primary heartbeat", ESP_MINER_TASK_STACK_SIZE_DEFAULT, pvParameters, 1, NULL, ESP_MINER_TASK_STACK_CAPS);
 
     ESP_LOGI(TAG, "Opening connection to pool: %s:%d", stratum_url, port);
     while (1) {

@@ -17,6 +17,7 @@
 #include "bap_uart.h"
 #include "bap_protocol.h"
 #include "bap.h"
+#include "esp_miner_caps.h"
 
 #define BAP_UART_NUM UART_NUM_2
 #define BAP_BUF_SIZE 1024
@@ -213,11 +214,11 @@ esp_err_t BAP_start_uart_receive_task(void) {
     xTaskCreateWithCaps(
         uart_receive_task,
         "uart_receive_ta",
-        8192,
+        ESP_MINER_TASK_STACK_SIZE_DEFAULT,
         NULL,
         5,
         &uart_receive_task_handle,
-        MALLOC_CAP_SPIRAM
+        ESP_MINER_TASK_STACK_CAPS
     );
 
     //ESP_LOGI(TAG, "UART receive task started");
@@ -263,11 +264,11 @@ esp_err_t BAP_uart_init(void) {
     BaseType_t task_result = xTaskCreateWithCaps(
         uart_send_task,
         "uart_send_task",
-        8192,
+        ESP_MINER_TASK_STACK_SIZE_DEFAULT,
         NULL,
         5,
         &uart_send_task_handle,
-        MALLOC_CAP_SPIRAM
+        ESP_MINER_TASK_STACK_CAPS
     );
     
     if (task_result != pdPASS) {
