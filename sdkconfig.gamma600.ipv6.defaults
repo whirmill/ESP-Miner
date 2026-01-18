@@ -1,0 +1,9 @@
+# Gamma 600 (no PSRAM) - IPv6 enabled overrides.
+#
+# Use via:
+#   idf.py -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.gamma600.defaults;sdkconfig.gamma600.ipv6.defaults" build
+#
+CONFIG_LWIP_IPV6=y
+CONFIG_LWIP_IPV6_AUTOCONFIG=y
+CONFIG_LWIP_USE_ESP_GETADDRINFO=y
+

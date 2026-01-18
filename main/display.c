@@ -260,12 +260,4 @@ esp_err_t display_on(bool display_on)
     return ESP_OK;
 }
 
-const DisplayConfig * get_display_config(const char * name)
-{
-    for (int i = 0 ; i < ARRAY_SIZE(display_configs); i++) {
-        if (strcmp(display_configs[i].name, name) == 0) {
-            return &display_configs[i];
-        }
-    }
-    return NULL;
-}
+// get_display_config is implemented in display_config.c
