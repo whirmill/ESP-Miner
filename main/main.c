@@ -83,7 +83,7 @@ void app_main(void)
 
     SYSTEM_init_peripherals(&GLOBAL_STATE);
 
-    if (xTaskCreate(POWER_MANAGEMENT_task, "power management", 8192, (void *) &GLOBAL_STATE, 10, NULL) != pdPASS) {
+    if (xTaskCreateWithCaps(POWER_MANAGEMENT_task, "power management", ESP_MINER_TASK_STACK_SIZE_DEFAULT, (void *) &GLOBAL_STATE, 10, NULL, ESP_MINER_TASK_STACK_CAPS) != pdPASS) {
         ESP_LOGE(TAG, "Error creating power management task");
     }
     if (xTaskCreate(FAN_CONTROLLER_task, "fan_controller", 8192, (void *) &GLOBAL_STATE, 5, NULL) != pdPASS) {
@@ -113,13 +113,13 @@ void app_main(void)
         return;
     }
 
-    if (xTaskCreate(stratum_task, "stratum admin", 8192, (void *) &GLOBAL_STATE, 5, NULL) != pdPASS) {
+    if (xTaskCreateWithCaps(stratum_task, "stratum admin", ESP_MINER_TASK_STACK_SIZE_DEFAULT, (void *) &GLOBAL_STATE, 5, NULL, ESP_MINER_TASK_STACK_CAPS) != pdPASS) {
         ESP_LOGE(TAG, "Error creating stratum admin task");
     }
-    if (xTaskCreate(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 20, NULL) != pdPASS) {
+    if (xTaskCreateWithCaps(create_jobs_task, "stratum miner", ESP_MINER_TASK_STACK_SIZE_DEFAULT, (void *) &GLOBAL_STATE, 20, NULL, ESP_MINER_TASK_STACK_CAPS) != pdPASS) {
         ESP_LOGE(TAG, "Error creating stratum miner task");
     }
-    if (xTaskCreate(ASIC_result_task, "asic result", 8192, (void *) &GLOBAL_STATE, 15, NULL) != pdPASS) {
+    if (xTaskCreateWithCaps(ASIC_result_task, "asic result", ESP_MINER_TASK_STACK_SIZE_DEFAULT, (void *) &GLOBAL_STATE, 15, NULL, ESP_MINER_TASK_STACK_CAPS) != pdPASS) {
         ESP_LOGE(TAG, "Error creating asic result task");
     }
     if (xTaskCreateWithCaps(hashrate_monitor_task, "hashrate monitor", ESP_MINER_TASK_STACK_SIZE_DEFAULT, (void *) &GLOBAL_STATE, 5, NULL, ESP_MINER_TASK_STACK_CAPS) != pdPASS) {

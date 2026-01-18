@@ -1336,9 +1336,19 @@ esp_err_t start_rest_server(void * pvParameters)
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.uri_match_fn = httpd_uri_match_wildcard;
+    // Reduce RAM usage on no-PSRAM targets.
+#if defined(CONFIG_SPIRAM) && CONFIG_SPIRAM
     config.stack_size = 8192;
+#else
+    config.stack_size = ESP_MINER_TASK_STACK_SIZE_DEFAULT;
+#endif
     // Keep this <= CONFIG_LWIP_MAX_SOCKETS (and leave some headroom for other sockets)
     int max_open_sockets = 20;
+#if defined(CONFIG_ESP_MINER_LIGHTWEIGHT_RAM) && CONFIG_ESP_MINER_LIGHTWEIGHT_RAM
+    max_open_sockets = 8;
+#elif !(defined(CONFIG_SPIRAM) && CONFIG_SPIRAM)
+    max_open_sockets = 10;
+#endif
 #ifdef CONFIG_LWIP_MAX_SOCKETS
     max_open_sockets = MIN(max_open_sockets, (int)CONFIG_LWIP_MAX_SOCKETS - 4);
 #endif

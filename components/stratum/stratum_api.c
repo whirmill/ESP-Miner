@@ -15,13 +15,21 @@
 #include "esp_crt_bundle.h"
 #include "utils.h"
 #include "esp_timer.h"
+#include "sdkconfig.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdbool.h>
 
 #define TRANSPORT_TIMEOUT_MS 5000
-#define BUFFER_SIZE 1024
+#define STRATUM_RECV_CHUNK_SIZE 1024
+#if defined(CONFIG_SPIRAM) && CONFIG_SPIRAM
+#define STRATUM_JSONRPC_INITIAL_SIZE 1024
+#else
+// Pre-allocate a larger buffer on no-PSRAM targets to avoid realloc() churn and fragmentation.
+#define STRATUM_JSONRPC_INITIAL_SIZE 4096
+#endif
+#define STRATUM_JSONRPC_MAX_SIZE (16 * 1024)
 #define MAX_EXTRANONCE_2_LEN 32
 static const char * TAG = "stratum_api";
 
@@ -90,20 +98,27 @@ esp_transport_handle_t STRATUM_V1_transport_init(tls_mode tls, char * cert)
     return transport;
 }
 
-void STRATUM_V1_initialize_buffer()
+bool STRATUM_V1_initialize_buffer(void)
 {
-    json_rpc_buffer = malloc(BUFFER_SIZE);
-    json_rpc_buffer_size = BUFFER_SIZE;
-    if (json_rpc_buffer == NULL) {
-        printf("Error: Failed to allocate memory for buffer\n");
-        exit(1);
+    if (json_rpc_buffer != NULL) {
+        return true;
     }
-    memset(json_rpc_buffer, 0, BUFFER_SIZE);
+
+    json_rpc_buffer = malloc(STRATUM_JSONRPC_INITIAL_SIZE);
+    json_rpc_buffer_size = STRATUM_JSONRPC_INITIAL_SIZE;
+    if (json_rpc_buffer == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate memory for Stratum JSON-RPC buffer");
+        json_rpc_buffer_size = 0;
+        return false;
+    }
+    memset(json_rpc_buffer, 0, json_rpc_buffer_size);
 
     for (int i = 0; i < MAX_REQUEST_IDS; i++) {
         request_timings[i].timestamp_us = 0;
         request_timings[i].tracking = false;
     }
+
+    return true;
 }
 
 void cleanup_stratum_buffer()
@@ -111,7 +126,7 @@ void cleanup_stratum_buffer()
     free(json_rpc_buffer);
 }
 
-static void realloc_json_buffer(size_t len)
+static bool realloc_json_buffer(size_t len)
 {
     size_t old, new;
 
@@ -119,36 +134,42 @@ static void realloc_json_buffer(size_t len)
     new = old + len + 1;
 
     if (new < json_rpc_buffer_size) {
-        return;
+        return true;
     }
 
-    new = new + (BUFFER_SIZE - (new % BUFFER_SIZE));
+    if (new > STRATUM_JSONRPC_MAX_SIZE) {
+        ESP_LOGE(TAG, "Stratum JSON-RPC buffer exceeded max size (%u bytes)", (unsigned)STRATUM_JSONRPC_MAX_SIZE);
+        return false;
+    }
+
+    new = new + (STRATUM_RECV_CHUNK_SIZE - (new % STRATUM_RECV_CHUNK_SIZE));
     void * new_sockbuf = realloc(json_rpc_buffer, new);
 
     if (new_sockbuf == NULL) {
-        fprintf(stderr, "Error: realloc failed in recalloc_sock()\n");
-        ESP_LOGI(TAG, "Restarting System because of ERROR: realloc failed in recalloc_sock");
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
-        esp_restart();
+        ESP_LOGE(TAG, "Out of memory: failed to grow Stratum JSON-RPC buffer (need %u bytes)", (unsigned)new);
+        return false;
     }
 
     json_rpc_buffer = new_sockbuf;
     memset(json_rpc_buffer + old, 0, new - old);
     json_rpc_buffer_size = new;
+    return true;
 }
 
 char * STRATUM_V1_receive_jsonrpc_line(esp_transport_handle_t transport)
 {
     if (json_rpc_buffer == NULL) {
-        STRATUM_V1_initialize_buffer();
+        if (!STRATUM_V1_initialize_buffer()) {
+            return NULL;
+        }
     }
     char *line = NULL;
-    char recv_buffer[BUFFER_SIZE];
+    char recv_buffer[STRATUM_RECV_CHUNK_SIZE];
     int nbytes;
 
     while (!strstr(json_rpc_buffer, "\n")) {
-        memset(recv_buffer, 0, BUFFER_SIZE);
-        nbytes = esp_transport_read(transport, recv_buffer, BUFFER_SIZE - 1, TRANSPORT_TIMEOUT_MS);
+        memset(recv_buffer, 0, STRATUM_RECV_CHUNK_SIZE);
+        nbytes = esp_transport_read(transport, recv_buffer, STRATUM_RECV_CHUNK_SIZE - 1, TRANSPORT_TIMEOUT_MS);
         if (nbytes < 0) {
             const char *err_str;
             switch(nbytes) {
@@ -169,11 +190,18 @@ char * STRATUM_V1_receive_jsonrpc_line(esp_transport_handle_t transport)
             if (json_rpc_buffer) {
                 free(json_rpc_buffer);
                 json_rpc_buffer = NULL;
+                json_rpc_buffer_size = 0;
             }
             return NULL;
         }
         if (nbytes > 0) {
-            realloc_json_buffer(nbytes);
+            if (!realloc_json_buffer(nbytes)) {
+                // Free buffer and force reconnect; caller will handle reconnect logic.
+                free(json_rpc_buffer);
+                json_rpc_buffer = NULL;
+                json_rpc_buffer_size = 0;
+                return NULL;
+            }
             strncat(json_rpc_buffer, recv_buffer, nbytes);
         }
     }

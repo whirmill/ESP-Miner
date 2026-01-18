@@ -13,6 +13,7 @@
 #include <math.h>
 #include "display.h"
 #include "theme_api.h"
+#include "esp_miner_caps.h"
 
 #define NVS_CONFIG_NAMESPACE "main"
 #define NVS_STR_LIMIT (4000 - 1) // See nvs_set_str
@@ -287,7 +288,7 @@ esp_err_t nvs_config_init(void)
     TaskHandle_t task_handle;
 
     // nvs_task heap _must_ be internal memory
-    BaseType_t task_result = xTaskCreate(nvs_task, "nvs_task", 8192, NULL, 5, &task_handle); 
+    BaseType_t task_result = xTaskCreate(nvs_task, "nvs_task", ESP_MINER_TASK_STACK_SIZE_DEFAULT, NULL, 5, &task_handle); 
     if (task_result != pdPASS) {
         ESP_LOGE(TAG, "Failed to create nvs_task");
 
