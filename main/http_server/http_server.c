@@ -38,6 +38,7 @@
 #include "vcore.h"
 #include "power.h"
 #include "connect.h"
+#include "esp_miner_caps.h"
 #include "asic.h"
 #include "TPS546.h"
 #include "statistics_task.h"
@@ -269,8 +270,8 @@ esp_err_t is_network_allowed(httpd_req_t * req)
     }
 
     int sockfd = httpd_req_to_sockfd(req);
-    char ipstr[INET6_ADDRSTRLEN];
-    struct sockaddr_in6 addr;   // esp_http_server uses IPv6 addressing
+    char ipstr[64];
+    struct sockaddr_storage addr;
     socklen_t addr_size = sizeof(addr);
 
     if (getpeername(sockfd, (struct sockaddr *)&addr, &addr_size) < 0) {
@@ -278,13 +279,25 @@ esp_err_t is_network_allowed(httpd_req_t * req)
         return ESP_FAIL;
     }
 
-    uint32_t request_ip_addr = addr.sin6_addr.un.u32_addr[3];
+    uint32_t request_ip_addr = 0;
 
-    // // Convert to IPv6 string
-    // inet_ntop(AF_INET, &addr.sin6_addr, ipstr, sizeof(ipstr));
-
-    // Convert to IPv4 string
-    inet_ntop(AF_INET, &request_ip_addr, ipstr, sizeof(ipstr));
+    if (addr.ss_family == AF_INET) {
+        struct sockaddr_in *addr4 = (struct sockaddr_in *)&addr;
+        request_ip_addr = addr4->sin_addr.s_addr;
+        inet_ntop(AF_INET, &addr4->sin_addr, ipstr, sizeof(ipstr));
+    }
+#if CONFIG_LWIP_IPV6
+    else if (addr.ss_family == AF_INET6) {
+        // esp_http_server uses IPv6 sockets; IPv4 clients can be represented as v4-mapped addresses.
+        struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *)&addr;
+        request_ip_addr = addr6->sin6_addr.un.u32_addr[3];
+        inet_ntop(AF_INET, &request_ip_addr, ipstr, sizeof(ipstr));
+    }
+#endif
+    else {
+        ESP_LOGW(CORS_TAG, "Unsupported address family: %d", addr.ss_family);
+        return ESP_FAIL;
+    }
 
     // Attempt to get the Origin header.
     char origin[128];
@@ -1434,7 +1447,7 @@ esp_err_t start_rest_server(void * pvParameters)
     httpd_register_err_handler(server, HTTPD_404_NOT_FOUND, http_404_error_handler);
 
     // Start websocket log handler thread
-    xTaskCreateWithCaps(websocket_task, "websocket_task", 8192, server, 2, NULL, MALLOC_CAP_SPIRAM);
+    xTaskCreateWithCaps(websocket_task, "websocket_task", ESP_MINER_TASK_STACK_SIZE_DEFAULT, server, 2, NULL, ESP_MINER_TASK_STACK_CAPS);
 
     // Start the DNS server that will redirect all queries to the softAP IP
     dns_server_config_t dns_config = DNS_SERVER_CONFIG_SINGLE("*" /* all A queries */, "WIFI_AP_DEF" /* softAP netif ID */);

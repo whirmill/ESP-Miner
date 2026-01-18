@@ -9,6 +9,7 @@
 #include "freertos/task.h"
 
 #include "asic.h"
+#include "esp_miner_caps.h"
 
 static const char *TAG = "asic_task";
 
@@ -21,8 +22,8 @@ void ASIC_task(void *pvParameters)
     //initialize the semaphore
     GLOBAL_STATE->ASIC_TASK_MODULE.semaphore = xSemaphoreCreateBinary();
 
-    GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs = heap_caps_malloc(sizeof(bm_job *) * 128, MALLOC_CAP_SPIRAM);
-    GLOBAL_STATE->valid_jobs = heap_caps_malloc(sizeof(uint8_t) * 128, MALLOC_CAP_SPIRAM);
+    GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs = heap_caps_malloc(sizeof(bm_job *) * 128, ESP_MINER_HEAP_ALLOC_CAPS);
+    GLOBAL_STATE->valid_jobs = heap_caps_malloc(sizeof(uint8_t) * 128, ESP_MINER_HEAP_ALLOC_CAPS);
     for (int i = 0; i < 128; i++)
     {
         GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[i] = NULL;

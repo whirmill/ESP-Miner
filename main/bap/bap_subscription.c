@@ -18,6 +18,7 @@
 #include "bap_uart.h"
 #include "bap.h"
 #include "connect.h"
+#include "esp_miner_caps.h"
 
 static const char *TAG = "BAP_SUBSCRIPTION";
 
@@ -308,11 +309,11 @@ esp_err_t BAP_start_mode_management_task(GlobalState *state) {
     xTaskCreateWithCaps(
         mode_management_task,
         "bap_mode_mgmt",
-        8192,
+        ESP_MINER_TASK_STACK_SIZE_DEFAULT,
         state,
         5,
         NULL,
-        MALLOC_CAP_SPIRAM
+        ESP_MINER_TASK_STACK_CAPS
     );
 
     //ESP_LOGI(TAG, "BAP mode management task started");

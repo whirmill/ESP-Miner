@@ -12,6 +12,7 @@
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
 #include "bap.h"
+#include "esp_miner_caps.h"
 
 static const char *TAG = "BAP";
 
@@ -45,7 +46,7 @@ esp_err_t BAP_init(GlobalState *state) {
         return ESP_ERR_NO_MEM;
     }
 
-    bap_uart_send_queue = xQueueCreateWithCaps(10, sizeof(bap_message_t), MALLOC_CAP_SPIRAM);
+    bap_uart_send_queue = xQueueCreateWithCaps(10, sizeof(bap_message_t), ESP_MINER_HEAP_ALLOC_CAPS);
     if (bap_uart_send_queue == NULL) {
         ESP_LOGE(TAG, "Failed to create UART send queue");
         vSemaphoreDelete(bap_subscription_mutex);

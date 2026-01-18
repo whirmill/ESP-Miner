@@ -250,13 +250,16 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
         wifi_softap_off();
         
         // Create IPv6 link-local address after WiFi connection
+#if CONFIG_LWIP_IPV6
         esp_netif_t *netif = event->esp_netif;
         esp_err_t ipv6_err = esp_netif_create_ip6_linklocal(netif);
         if (ipv6_err != ESP_OK) {
             ESP_LOGE(TAG, "Failed to create IPv6 link-local address: %s", esp_err_to_name(ipv6_err));
         }
+#endif
     }
 
+#if CONFIG_LWIP_IPV6
     if (event_base == IP_EVENT && event_id == IP_EVENT_GOT_IP6) {
         ip_event_got_ip6_t * event = (ip_event_got_ip6_t *) event_data;
         
@@ -287,6 +290,7 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
             ESP_LOGI(TAG, "IPv6 Address: %s", GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str);
         }
     }
+#endif
 }
 
 esp_netif_t * wifi_init_softap(GlobalState * GLOBAL_STATE)
@@ -404,10 +408,12 @@ void wifi_init(void * pvParameters)
 
     esp_event_handler_instance_t instance_any_id;
     esp_event_handler_instance_t instance_got_ip;
-    esp_event_handler_instance_t instance_got_ip6;
     ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, GLOBAL_STATE, &instance_any_id));
     ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, GLOBAL_STATE, &instance_got_ip));
+#if CONFIG_LWIP_IPV6
+    esp_event_handler_instance_t instance_got_ip6;
     ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_GOT_IP6, &event_handler, GLOBAL_STATE, &instance_got_ip6));
+#endif
 
     /* Initialize Wi-Fi */
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
