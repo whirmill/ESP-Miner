@@ -81,6 +81,18 @@ void app_main(void)
     // init AP and connect to wifi
     wifi_init(&GLOBAL_STATE);
 
+    // Create the memory-critical tasks early (before display/LVGL init) to reduce heap fragmentation
+    // on no-PSRAM targets. These tasks self-gate until the ASIC and peripherals are ready.
+    if (xTaskCreateWithCaps(ASIC_result_task, "asic result", ESP_MINER_TASK_STACK_SIZE_SMALL, (void *) &GLOBAL_STATE, 15, NULL, ESP_MINER_TASK_STACK_CAPS) != pdPASS) {
+        ESP_LOGE(TAG, "Error creating asic result task");
+    }
+    if (xTaskCreateWithCaps(hashrate_monitor_task, "hashrate monitor", ESP_MINER_TASK_STACK_SIZE_SMALL, (void *) &GLOBAL_STATE, 5, NULL, ESP_MINER_TASK_STACK_CAPS) != pdPASS) {
+        ESP_LOGE(TAG, "Error creating hashrate monitor task");
+    }
+    if (xTaskCreateWithCaps(statistics_task, "statistics", ESP_MINER_TASK_STACK_SIZE_SMALL, (void *) &GLOBAL_STATE, 3, NULL, ESP_MINER_TASK_STACK_CAPS) != pdPASS) {
+        ESP_LOGE(TAG, "Error creating statistics task");
+    }
+
     SYSTEM_init_peripherals(&GLOBAL_STATE);
 
     if (xTaskCreateWithCaps(POWER_MANAGEMENT_task, "power management", ESP_MINER_TASK_STACK_SIZE_DEFAULT, (void *) &GLOBAL_STATE, 10, NULL, ESP_MINER_TASK_STACK_CAPS) != pdPASS) {
@@ -118,14 +130,5 @@ void app_main(void)
     }
     if (xTaskCreateWithCaps(create_jobs_task, "stratum miner", ESP_MINER_TASK_STACK_SIZE_DEFAULT, (void *) &GLOBAL_STATE, 20, NULL, ESP_MINER_TASK_STACK_CAPS) != pdPASS) {
         ESP_LOGE(TAG, "Error creating stratum miner task");
-    }
-    if (xTaskCreateWithCaps(ASIC_result_task, "asic result", ESP_MINER_TASK_STACK_SIZE_DEFAULT, (void *) &GLOBAL_STATE, 15, NULL, ESP_MINER_TASK_STACK_CAPS) != pdPASS) {
-        ESP_LOGE(TAG, "Error creating asic result task");
-    }
-    if (xTaskCreateWithCaps(hashrate_monitor_task, "hashrate monitor", ESP_MINER_TASK_STACK_SIZE_DEFAULT, (void *) &GLOBAL_STATE, 5, NULL, ESP_MINER_TASK_STACK_CAPS) != pdPASS) {
-        ESP_LOGE(TAG, "Error creating hashrate monitor task");
-    }
-    if (xTaskCreateWithCaps(statistics_task, "statistics", ESP_MINER_TASK_STACK_SIZE_DEFAULT, (void *) &GLOBAL_STATE, 3, NULL, ESP_MINER_TASK_STACK_CAPS) != pdPASS) {
-        ESP_LOGE(TAG, "Error creating statistics task");
     }
 }

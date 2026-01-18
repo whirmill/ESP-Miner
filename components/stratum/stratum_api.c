@@ -23,6 +23,9 @@
 
 #define TRANSPORT_TIMEOUT_MS 5000
 #define STRATUM_RECV_CHUNK_SIZE 1024
+// Stack buffer used for outgoing JSON messages.
+// Keep this reasonably small for no-PSRAM targets while still accommodating long usernames.
+#define STRATUM_TX_BUF_SIZE 1024
 #if defined(CONFIG_SPIRAM) && CONFIG_SPIRAM
 #define STRATUM_JSONRPC_INITIAL_SIZE 1024
 #else
@@ -124,6 +127,8 @@ bool STRATUM_V1_initialize_buffer(void)
 void cleanup_stratum_buffer()
 {
     free(json_rpc_buffer);
+    json_rpc_buffer = NULL;
+    json_rpc_buffer_size = 0;
 }
 
 static bool realloc_json_buffer(size_t len)
@@ -468,7 +473,7 @@ static void debug_stratum_tx(const char * msg)
 int STRATUM_V1_subscribe(esp_transport_handle_t transport, int send_uid, const char * model)
 {
     // Subscribe
-    char subscribe_msg[BUFFER_SIZE];
+    char subscribe_msg[STRATUM_TX_BUF_SIZE];
     const esp_app_desc_t *app_desc = esp_app_get_description();
     const char *version = app_desc->version;	
     snprintf(subscribe_msg, sizeof(subscribe_msg),
@@ -481,7 +486,7 @@ int STRATUM_V1_subscribe(esp_transport_handle_t transport, int send_uid, const c
 
 int STRATUM_V1_suggest_difficulty(esp_transport_handle_t transport, int send_uid, uint32_t difficulty)
 {
-    char difficulty_msg[BUFFER_SIZE];
+    char difficulty_msg[STRATUM_TX_BUF_SIZE];
     snprintf(difficulty_msg, sizeof(difficulty_msg),
         "{\"id\":%d,\"method\":\"mining.suggest_difficulty\",\"params\":[%ld]}\n",
         send_uid, difficulty);
@@ -492,7 +497,7 @@ int STRATUM_V1_suggest_difficulty(esp_transport_handle_t transport, int send_uid
 
 int STRATUM_V1_extranonce_subscribe(esp_transport_handle_t transport, int send_uid)
 {
-    char extranonce_msg[BUFFER_SIZE];
+    char extranonce_msg[STRATUM_TX_BUF_SIZE];
     snprintf(extranonce_msg, sizeof(extranonce_msg),
         "{\"id\":%d,\"method\":\"mining.extranonce.subscribe\",\"params\":[]}\n",
         send_uid);
@@ -503,7 +508,7 @@ int STRATUM_V1_extranonce_subscribe(esp_transport_handle_t transport, int send_u
 
 int STRATUM_V1_authorize(esp_transport_handle_t transport, int send_uid, const char * username, const char * pass)
 {
-    char authorize_msg[BUFFER_SIZE];
+    char authorize_msg[STRATUM_TX_BUF_SIZE];
     snprintf(authorize_msg, sizeof(authorize_msg),
         "{\"id\":%d,\"method\":\"mining.authorize\",\"params\":[\"%s\",\"%s\"]}\n",
         send_uid, username, pass);
@@ -514,7 +519,7 @@ int STRATUM_V1_authorize(esp_transport_handle_t transport, int send_uid, const c
 
 int STRATUM_V1_pong(esp_transport_handle_t transport, int message_id)
 {
-    char pong_msg[BUFFER_SIZE];
+    char pong_msg[STRATUM_TX_BUF_SIZE];
     snprintf(pong_msg, sizeof(pong_msg),
         "{\"id\":%d,\"method\":\"pong\",\"params\":[]}\n",
         message_id);
@@ -535,7 +540,7 @@ int STRATUM_V1_submit_share(esp_transport_handle_t transport, int send_uid, cons
                             const char * extranonce_2, const uint32_t ntime,
                             const uint32_t nonce, const uint32_t version_bits)
 {
-    char submit_msg[BUFFER_SIZE];
+    char submit_msg[STRATUM_TX_BUF_SIZE];
     snprintf(submit_msg, sizeof(submit_msg),
         "{\"id\":%d,\"method\":\"mining.submit\",\"params\":[\"%s\",\"%s\",\"%s\",\"%08lx\",\"%08lx\",\"%08lx\"]}\n",
         send_uid, username, job_id, extranonce_2, ntime, nonce, version_bits);
@@ -550,7 +555,7 @@ int STRATUM_V1_submit_share(esp_transport_handle_t transport, int send_uid, cons
 
 int STRATUM_V1_configure_version_rolling(esp_transport_handle_t transport, int send_uid, uint32_t * version_mask)
 {
-    char configure_msg[BUFFER_SIZE];
+    char configure_msg[STRATUM_TX_BUF_SIZE];
     snprintf(configure_msg, sizeof(configure_msg),
         "{\"id\":%d,\"method\":\"mining.configure\",\"params\":[[\"version-rolling\"],{\"version-rolling.mask\":\"ffffffff\"}]}\n",
         send_uid);

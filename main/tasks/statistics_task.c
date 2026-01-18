@@ -124,6 +124,9 @@ void statistics_task(void * pvParameters)
     PowerManagementModule * power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
     struct StatisticsData statsData = {};
 
+    // Give peripherals (I2C sensors, VCORE, thermal) time to initialize before sampling.
+    vTaskDelay(3000 / portTICK_PERIOD_MS);
+
     TickType_t taskWakeTime = xTaskGetTickCount();
 
     while (1) {

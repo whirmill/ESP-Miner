@@ -137,16 +137,44 @@ void hashrate_monitor_task(void *pvParameters)
     HashrateMonitorModule * HASHRATE_MONITOR_MODULE = &GLOBAL_STATE->HASHRATE_MONITOR_MODULE;
     SystemModule * SYSTEM_MODULE = &GLOBAL_STATE->SYSTEM_MODULE;
 
+    // Wait for ASIC init before allocating buffers and issuing register reads.
+    while (!GLOBAL_STATE->ASIC_initalized) {
+        vTaskDelay(200 / portTICK_PERIOD_MS);
+    }
+
     int asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
     int hash_domains = GLOBAL_STATE->DEVICE_CONFIG.family.asic.hash_domains;
 
-    HASHRATE_MONITOR_MODULE->total_measurement = heap_caps_malloc(asic_count * sizeof(measurement_t), ESP_MINER_HEAP_ALLOC_CAPS);
-    measurement_t* data = heap_caps_malloc(asic_count * hash_domains * sizeof(measurement_t), ESP_MINER_HEAP_ALLOC_CAPS);
-    HASHRATE_MONITOR_MODULE->domain_measurements = heap_caps_malloc(asic_count * sizeof(measurement_t*), ESP_MINER_HEAP_ALLOC_CAPS);
+    measurement_t* data = NULL;
+    while (HASHRATE_MONITOR_MODULE->total_measurement == NULL ||
+           HASHRATE_MONITOR_MODULE->domain_measurements == NULL ||
+           HASHRATE_MONITOR_MODULE->error_measurement == NULL ||
+           data == NULL) {
+        HASHRATE_MONITOR_MODULE->total_measurement = heap_caps_malloc(asic_count * sizeof(measurement_t), ESP_MINER_HEAP_ALLOC_CAPS);
+        data = heap_caps_malloc(asic_count * hash_domains * sizeof(measurement_t), ESP_MINER_HEAP_ALLOC_CAPS);
+        HASHRATE_MONITOR_MODULE->domain_measurements = heap_caps_malloc(asic_count * sizeof(measurement_t*), ESP_MINER_HEAP_ALLOC_CAPS);
+        HASHRATE_MONITOR_MODULE->error_measurement = heap_caps_malloc(asic_count * sizeof(measurement_t), ESP_MINER_HEAP_ALLOC_CAPS);
+
+        if (HASHRATE_MONITOR_MODULE->total_measurement == NULL ||
+            HASHRATE_MONITOR_MODULE->domain_measurements == NULL ||
+            HASHRATE_MONITOR_MODULE->error_measurement == NULL ||
+            data == NULL) {
+            ESP_LOGW(TAG, "Not enough memory for hashrate monitor buffers; retrying...");
+            heap_caps_free(HASHRATE_MONITOR_MODULE->total_measurement);
+            heap_caps_free(HASHRATE_MONITOR_MODULE->domain_measurements);
+            heap_caps_free(HASHRATE_MONITOR_MODULE->error_measurement);
+            heap_caps_free(data);
+            HASHRATE_MONITOR_MODULE->total_measurement = NULL;
+            HASHRATE_MONITOR_MODULE->domain_measurements = NULL;
+            HASHRATE_MONITOR_MODULE->error_measurement = NULL;
+            data = NULL;
+            vTaskDelay(5000 / portTICK_PERIOD_MS);
+        }
+    }
+
     for (size_t asic_nr = 0; asic_nr < asic_count; asic_nr++) {
         HASHRATE_MONITOR_MODULE->domain_measurements[asic_nr] = data + (asic_nr * hash_domains);
     }
-    HASHRATE_MONITOR_MODULE->error_measurement = heap_caps_malloc(asic_count * sizeof(measurement_t), ESP_MINER_HEAP_ALLOC_CAPS);
 
     clear_measurements(GLOBAL_STATE);
 
