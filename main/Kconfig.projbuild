@@ -46,6 +46,16 @@ menu "ESP-Miner Build Options"
             - No captive DNS server.
             - Long-press button will not toggle SoftAP.
 
+    config ESP_MINER_DISABLE_BAP
+        bool "Disable BAP subsystem (UART accessory protocol)"
+        default n
+        help
+            Disable the Bitaxe Accessory Protocol (BAP) subsystem.
+
+            This saves RAM by skipping BAP queues, mutexes, and background tasks.
+            Intended for lightweight, external-control builds that rely on
+            REST/WebSocket APIs instead of UART accessories.
+
 endmenu
 
 menu "Bitaxe Configuration"

@@ -1334,7 +1334,9 @@ esp_err_t start_rest_server(void * pvParameters)
     }
     config.max_open_sockets = max_open_sockets;
 #if defined(CONFIG_ESP_MINER_LIGHTWEIGHT_RAM) && CONFIG_ESP_MINER_LIGHTWEIGHT_RAM
-    config.max_uri_handlers = 12;
+    // Keep this comfortably above the number of /api/* endpoints we register in headless/no-web-ui builds.
+    // Too-low values can cause handler registration failures (or aborts via ESP_ERROR_CHECK in helpers).
+    config.max_uri_handlers = 24;
 #elif !(defined(CONFIG_SPIRAM) && CONFIG_SPIRAM)
     config.max_uri_handlers = 16;
 #else
@@ -1365,8 +1367,10 @@ esp_err_t start_rest_server(void * pvParameters)
     };
     httpd_register_uri_handler(server, &recovery_explicit_get_uri);
     
-    // Register theme API endpoints
+    // Theme endpoints are only needed by the AxeOS web UI.
+#if !CONFIG_ESP_MINER_HEADLESS && !CONFIG_ESP_MINER_DISABLE_WEB_UI
     ESP_ERROR_CHECK(register_theme_api_endpoints(server, rest_context));
+#endif
 
     /* URI handler for fetching system info */
     httpd_uri_t system_info_get_uri = {
@@ -1458,6 +1462,7 @@ esp_err_t start_rest_server(void * pvParameters)
     };
     httpd_register_uri_handler(server, &update_post_ota_firmware);
 
+#if !CONFIG_ESP_MINER_HEADLESS && !CONFIG_ESP_MINER_DISABLE_WEB_UI
     httpd_uri_t update_post_ota_www = {
         .uri = "/api/system/OTAWWW", 
         .method = HTTP_POST, 
@@ -1465,6 +1470,7 @@ esp_err_t start_rest_server(void * pvParameters)
         .user_ctx = NULL
     };
     httpd_register_uri_handler(server, &update_post_ota_www);
+#endif
 
     httpd_uri_t ws = {
         .uri = "/api/ws", 
