@@ -21,7 +21,10 @@ static uint16_t statisticsDataStart;
 static uint16_t statisticsDataSize;
 static pthread_mutex_t statisticsDataLock = PTHREAD_MUTEX_INITIALIZER;
 
-#if defined(CONFIG_SPIRAM) && CONFIG_SPIRAM
+#if defined(CONFIG_ESP_MINER_LIGHTWEIGHT_RAM) && CONFIG_ESP_MINER_LIGHTWEIGHT_RAM
+// Keep only the latest sample to minimize RAM usage (no historical graphs).
+static const uint16_t maxDataCount = 1;
+#elif defined(CONFIG_SPIRAM) && CONFIG_SPIRAM
 static const uint16_t maxDataCount = 720;
 #else
 static const uint16_t maxDataCount = 180;
