@@ -98,11 +98,15 @@ idf_build_set_property(COMPILE_OPTIONS "-DLV_CONF_PATH=\"${CMAKE_SOURCE_DIR}/mai
 
 set(WEB_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/http_server/axe-os")
 
-if(CONFIG_ESP_MINER_HEADLESS)
-    message(STATUS "Headless build: skipping web UI build; generating minimal www filesystem")
+if(CONFIG_ESP_MINER_HEADLESS OR CONFIG_ESP_MINER_DISABLE_WEB_UI)
+    message(STATUS "Skipping AxeOS web UI build; generating minimal www filesystem")
     set(WEB_HEADLESS_DIR "${CMAKE_BINARY_DIR}/dist-headless/axe-os")
     file(MAKE_DIRECTORY "${WEB_HEADLESS_DIR}")
-    file(WRITE "${WEB_HEADLESS_DIR}/version.txt" "headless\n")
+    if(CONFIG_ESP_MINER_HEADLESS)
+        file(WRITE "${WEB_HEADLESS_DIR}/version.txt" "headless\n")
+    else()
+        file(WRITE "${WEB_HEADLESS_DIR}/version.txt" "no-web-ui\n")
+    endif()
     spiffs_create_partition_image(www ${WEB_HEADLESS_DIR} FLASH_IN_PROJECT)
 elseif("$ENV{GITHUB_ACTIONS}" STREQUAL "true")
     message(STATUS "Running on GitHub Actions. Web ui will be prebuilt.")
