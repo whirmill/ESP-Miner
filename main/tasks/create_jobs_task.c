@@ -12,6 +12,7 @@
 #include "asic.h"
 #include "system.h"
 #include "esp_heap_caps.h"
+#include "esp_miner_caps.h"
 
 static const char *TAG = "create_jobs_task";
 
@@ -22,8 +23,8 @@ void create_jobs_task(void *pvParameters)
     GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
 
     // Initialize ASIC task module (moved from ASIC_task)
-    GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs = heap_caps_malloc(sizeof(bm_job *) * 128, MALLOC_CAP_SPIRAM);
-    GLOBAL_STATE->valid_jobs = heap_caps_malloc(sizeof(uint8_t) * 128, MALLOC_CAP_SPIRAM);
+    GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs = heap_caps_malloc(sizeof(bm_job *) * 128, ESP_MINER_HEAP_ALLOC_CAPS);
+    GLOBAL_STATE->valid_jobs = heap_caps_malloc(sizeof(uint8_t) * 128, ESP_MINER_HEAP_ALLOC_CAPS);
     for (int i = 0; i < 128; i++) {
         GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[i] = NULL;
         GLOBAL_STATE->valid_jobs[i] = 0;
