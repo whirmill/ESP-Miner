@@ -85,13 +85,13 @@ void app_main(void)
 
     // Create the memory-critical tasks early (before display/LVGL init) to reduce heap fragmentation
     // on no-PSRAM targets. These tasks self-gate until the ASIC and peripherals are ready.
-    if (xTaskCreateWithCaps(ASIC_result_task, "asic result", ESP_MINER_TASK_STACK_SIZE_SMALL, (void *) &GLOBAL_STATE, 15, NULL, ESP_MINER_TASK_STACK_CAPS) != pdPASS) {
+    if (xTaskCreateWithCaps(ASIC_result_task, "asic result", ESP_MINER_TASK_STACK_SIZE_DEFAULT, (void *) &GLOBAL_STATE, 15, NULL, ESP_MINER_TASK_STACK_CAPS) != pdPASS) {
         ESP_LOGE(TAG, "Error creating asic result task");
     }
     if (xTaskCreateWithCaps(hashrate_monitor_task, "hashrate monitor", ESP_MINER_TASK_STACK_SIZE_SMALL, (void *) &GLOBAL_STATE, 5, NULL, ESP_MINER_TASK_STACK_CAPS) != pdPASS) {
         ESP_LOGE(TAG, "Error creating hashrate monitor task");
     }
-    if (xTaskCreateWithCaps(statistics_task, "statistics", ESP_MINER_TASK_STACK_SIZE_TINY, (void *) &GLOBAL_STATE, 3, NULL, ESP_MINER_TASK_STACK_CAPS) != pdPASS) {
+    if (xTaskCreateWithCaps(statistics_task, "statistics", ESP_MINER_TASK_STACK_SIZE_SMALL, (void *) &GLOBAL_STATE, 3, NULL, ESP_MINER_TASK_STACK_CAPS) != pdPASS) {
         ESP_LOGE(TAG, "Error creating statistics task");
     }
 
