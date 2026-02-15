@@ -1317,10 +1317,17 @@ esp_err_t start_rest_server(void * pvParameters)
     const char * base_path = "";
 
     bool enter_recovery = false;
+#if CONFIG_ESP_MINER_HEADLESS || CONFIG_ESP_MINER_DISABLE_WEB_UI
+    char * axeos_override = NULL;
 #if CONFIG_ESP_MINER_HEADLESS
-    strcpy(axeOSVersion, "headless");
-#elif CONFIG_ESP_MINER_DISABLE_WEB_UI
-    strcpy(axeOSVersion, "disabled");
+    axeos_override = strdup("headless");
+#else
+    axeos_override = strdup("disabled");
+#endif
+    if (axeos_override != NULL) {
+        free(GLOBAL_STATE->SYSTEM_MODULE.axeOSVersion);
+        GLOBAL_STATE->SYSTEM_MODULE.axeOSVersion = axeos_override;
+    }
 #else
     if (init_fs() != ESP_OK) {
         // Unable to initialize the web app filesystem.
