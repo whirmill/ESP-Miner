@@ -17,9 +17,14 @@
 
 static const char * TAG = "websocket";
 
+typedef struct {
+    uint16_t len;
+    char text[WEBSOCKET_MAX_LOG_LINE_BYTES + 2];
+} websocket_log_entry_t;
+
 static QueueHandle_t log_queue = NULL;
 static StaticQueue_t log_queue_struct;
-static uint8_t log_queue_storage[MESSAGE_QUEUE_SIZE * sizeof(char *)];
+static uint8_t log_queue_storage[MESSAGE_QUEUE_SIZE * sizeof(websocket_log_entry_t)];
 static int clients[MAX_WEBSOCKET_CLIENTS];
 static int active_clients = 0;
 static SemaphoreHandle_t clients_mutex = NULL;
@@ -50,23 +55,25 @@ int log_to_queue(const char *format, va_list args)
         log_line[len] = '\0';
     }
 
-    // Allocate only what's needed for the queue item.
-    char *log_buffer = (char *)calloc(len + 1, sizeof(char));
-    if (log_buffer == NULL) {
-        // Keep stdout logging even if WebSocket forwarding fails under low memory.
-        fputs(log_line, stdout);
+    // Print to standard output
+    fputs(log_line, stdout);
+
+    // Skip queue allocation when no clients are connected.
+    if (active_clients <= 0) {
         return 0;
     }
-    memcpy(log_buffer, log_line, len + 1);
 
-    // Print to standard output
-    fputs(log_buffer, stdout);
+    // If queue is full, drop forwarding to avoid heap churn under pressure.
+    if (uxQueueSpacesAvailable(log_queue) == 0) {
+        return 0;
+    }
+
+    websocket_log_entry_t entry = {0};
+    entry.len = (uint16_t)len;
+    memcpy(entry.text, log_line, len + 1);
 
     // Send to queue for WebSocket broadcasting
-    if (xQueueSendToBack(log_queue, &log_buffer, pdMS_TO_TICKS(100)) != pdPASS) {
-        ESP_LOGW(TAG, "Failed to send log to queue, freeing buffer");
-        free(log_buffer);
-    }
+    xQueueSendToBack(log_queue, &entry, 0);
 
     return 0;
 }
@@ -197,20 +204,12 @@ esp_err_t websocket_handler(httpd_req_t *req)
         return ESP_OK;
     }
 
-    uint8_t *buf = NULL;
+    uint8_t frame_buffer[WEBSOCKET_MAX_RX_FRAME_BYTES] = {0};
     if (ws_pkt.len > 0) {
-        buf = (uint8_t *)calloc(ws_pkt.len, sizeof(uint8_t));
-        if (buf == NULL) {
-            ESP_LOGE(TAG, "Failed to allocate memory for WebSocket frame buffer (%u bytes)", (unsigned)ws_pkt.len);
-            remove_client(httpd_req_to_sockfd(req));
-            return ESP_FAIL;
-        }
-
-        ws_pkt.payload = buf;
+        ws_pkt.payload = frame_buffer;
         ret = httpd_ws_recv_frame(req, &ws_pkt, ws_pkt.len);
         if (ret != ESP_OK) {
             ESP_LOGE(TAG, "WebSocket frame receive failed: %s", esp_err_to_name(ret));
-            free(buf);
             remove_client(httpd_req_to_sockfd(req));
             return ret;
         }
@@ -220,7 +219,6 @@ esp_err_t websocket_handler(httpd_req_t *req)
 
     if (ws_pkt.type == HTTPD_WS_TYPE_CLOSE) {
         ESP_LOGI(TAG, "WebSocket close frame received, fd: %d", httpd_req_to_sockfd(req));
-        free(buf);
         remove_client(httpd_req_to_sockfd(req));
         return ESP_OK;
     }
@@ -234,7 +232,6 @@ esp_err_t websocket_handler(httpd_req_t *req)
         }
     }
 
-    free(buf);
     return ESP_OK;
 }
 
@@ -265,7 +262,7 @@ void websocket_task(void *pvParameters)
             continue;
         }
 
-        char *message;
+        websocket_log_entry_t message = {0};
         if (xQueueReceive(log_queue, &message, pdMS_TO_TICKS(1000)) != pdPASS) {
             continue;
         }
@@ -275,8 +272,8 @@ void websocket_task(void *pvParameters)
             if (client_fd != -1) {
                 httpd_ws_frame_t ws_pkt;
                 memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
-                ws_pkt.payload = (uint8_t *)message;
-                ws_pkt.len = strlen(message);
+                ws_pkt.payload = (uint8_t *)message.text;
+                ws_pkt.len = message.len;
                 ws_pkt.type = HTTPD_WS_TYPE_TEXT;
 
                 if (httpd_ws_send_frame_async(https_handle, client_fd, &ws_pkt) != ESP_OK) {
@@ -286,6 +283,5 @@ void websocket_task(void *pvParameters)
             }
         }
 
-        free(message);
     }
 }

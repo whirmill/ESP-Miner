@@ -1,16 +1,17 @@
 # Gamma 600 (no PSRAM) - Pluto headless (external control)
 #
-# - Keeps display UI + REST API + WebSocket.
-# - Disables AxeOS static web dashboard (no GUI).
+# - Disables display UI + AxeOS static web dashboard.
+# - Keeps REST API + WebSocket for external controller.
 # - Disables Wi-Fi configuration SoftAP/captive portal (STA-only).
 # - Reduces in-RAM historical metric buffers.
 #
 # Use via:
-#   idf.py -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.gamma600.defaults;sdkconfig.gamma600.ipv6.defaults;sdkconfig.gamma600.pluto-headless.defaults" build
+#   idf.py -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.gamma600.defaults;sdkconfig.gamma600.pluto-headless.defaults" build
 #
 CONFIG_ESP_MINER_DISABLE_WEB_UI=y
-CONFIG_ESP_MINER_HEADLESS=n
+CONFIG_ESP_MINER_HEADLESS=y
 CONFIG_ESP_MINER_LIGHTWEIGHT_RAM=y
 CONFIG_ESP_MINER_DISABLE_CONFIG_AP=y
 CONFIG_ESP_MINER_DISABLE_BAP=y
-CONFIG_LWIP_MAX_SOCKETS=16
+CONFIG_LWIP_IPV6=n
+CONFIG_LWIP_MAX_SOCKETS=12

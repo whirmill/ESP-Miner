@@ -38,6 +38,7 @@ static const char * TAG = "stratum_api";
 
 static char * json_rpc_buffer = NULL;
 static size_t json_rpc_buffer_size = 0;
+static size_t json_rpc_buffer_len = 0;
 
 static RequestTiming request_timings[MAX_REQUEST_IDS];
 
@@ -112,9 +113,11 @@ bool STRATUM_V1_initialize_buffer(void)
     if (json_rpc_buffer == NULL) {
         ESP_LOGE(TAG, "Failed to allocate memory for Stratum JSON-RPC buffer");
         json_rpc_buffer_size = 0;
+        json_rpc_buffer_len = 0;
         return false;
     }
     memset(json_rpc_buffer, 0, json_rpc_buffer_size);
+    json_rpc_buffer_len = 0;
 
     for (int i = 0; i < MAX_REQUEST_IDS; i++) {
         request_timings[i].timestamp_us = 0;
@@ -129,14 +132,13 @@ void cleanup_stratum_buffer()
     free(json_rpc_buffer);
     json_rpc_buffer = NULL;
     json_rpc_buffer_size = 0;
+    json_rpc_buffer_len = 0;
 }
 
 static bool realloc_json_buffer(size_t len)
 {
-    size_t old, new;
-
-    old = strlen(json_rpc_buffer);
-    new = old + len + 1;
+    size_t old = json_rpc_buffer_len;
+    size_t new = old + len + 1;
 
     if (new < json_rpc_buffer_size) {
         return true;
@@ -147,7 +149,9 @@ static bool realloc_json_buffer(size_t len)
         return false;
     }
 
-    new = new + (STRATUM_RECV_CHUNK_SIZE - (new % STRATUM_RECV_CHUNK_SIZE));
+    if (new % STRATUM_RECV_CHUNK_SIZE != 0) {
+        new = new + (STRATUM_RECV_CHUNK_SIZE - (new % STRATUM_RECV_CHUNK_SIZE));
+    }
     void * new_sockbuf = realloc(json_rpc_buffer, new);
 
     if (new_sockbuf == NULL) {
@@ -172,7 +176,7 @@ char * STRATUM_V1_receive_jsonrpc_line(esp_transport_handle_t transport)
     char recv_buffer[STRATUM_RECV_CHUNK_SIZE];
     int nbytes;
 
-    while (!strstr(json_rpc_buffer, "\n")) {
+    while (memchr(json_rpc_buffer, '\n', json_rpc_buffer_len) == NULL) {
         memset(recv_buffer, 0, STRATUM_RECV_CHUNK_SIZE);
         nbytes = esp_transport_read(transport, recv_buffer, STRATUM_RECV_CHUNK_SIZE - 1, TRANSPORT_TIMEOUT_MS);
         if (nbytes < 0) {
@@ -196,6 +200,7 @@ char * STRATUM_V1_receive_jsonrpc_line(esp_transport_handle_t transport)
                 free(json_rpc_buffer);
                 json_rpc_buffer = NULL;
                 json_rpc_buffer_size = 0;
+                json_rpc_buffer_len = 0;
             }
             return NULL;
         }
@@ -205,25 +210,27 @@ char * STRATUM_V1_receive_jsonrpc_line(esp_transport_handle_t transport)
                 free(json_rpc_buffer);
                 json_rpc_buffer = NULL;
                 json_rpc_buffer_size = 0;
+                json_rpc_buffer_len = 0;
                 return NULL;
             }
-            strncat(json_rpc_buffer, recv_buffer, nbytes);
+            memcpy(json_rpc_buffer + json_rpc_buffer_len, recv_buffer, nbytes);
+            json_rpc_buffer_len += nbytes;
+            json_rpc_buffer[json_rpc_buffer_len] = '\0';
         }
     }
 
     // Extract the line
-    size_t buflen = strlen(json_rpc_buffer);
-    char *newline_pos = strchr(json_rpc_buffer, '\n');
+    size_t buflen = json_rpc_buffer_len;
+    char *newline_pos = memchr(json_rpc_buffer, '\n', buflen);
     if (newline_pos) {
         size_t line_len = newline_pos - json_rpc_buffer;
         line = strndup(json_rpc_buffer, line_len);  // Copy only up to \n
         size_t remaining_len = buflen - line_len - 1;
         if (remaining_len > 0) {
             memmove(json_rpc_buffer, newline_pos + 1, remaining_len);
-            json_rpc_buffer[remaining_len] = '\0';
-        } else {
-            json_rpc_buffer[0] = '\0';
         }
+        json_rpc_buffer_len = remaining_len;
+        json_rpc_buffer[json_rpc_buffer_len] = '\0';
     }
     return line;
 }

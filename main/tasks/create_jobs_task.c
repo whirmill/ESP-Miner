@@ -23,8 +23,20 @@ void create_jobs_task(void *pvParameters)
     GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
 
     // Initialize ASIC task module (moved from ASIC_task)
-    GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs = heap_caps_malloc(sizeof(bm_job *) * 128, ESP_MINER_HEAP_ALLOC_CAPS);
-    GLOBAL_STATE->valid_jobs = heap_caps_malloc(sizeof(uint8_t) * 128, ESP_MINER_HEAP_ALLOC_CAPS);
+    while (GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs == NULL || GLOBAL_STATE->valid_jobs == NULL) {
+        GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs = heap_caps_malloc(sizeof(bm_job *) * 128, ESP_MINER_HEAP_ALLOC_CAPS);
+        GLOBAL_STATE->valid_jobs = heap_caps_malloc(sizeof(uint8_t) * 128, ESP_MINER_HEAP_ALLOC_CAPS);
+
+        if (GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs == NULL || GLOBAL_STATE->valid_jobs == NULL) {
+            ESP_LOGW(TAG, "Not enough memory for job tracking arrays; retrying...");
+            heap_caps_free(GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs);
+            heap_caps_free(GLOBAL_STATE->valid_jobs);
+            GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs = NULL;
+            GLOBAL_STATE->valid_jobs = NULL;
+            vTaskDelay(2000 / portTICK_PERIOD_MS);
+        }
+    }
+
     for (int i = 0; i < 128; i++) {
         GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[i] = NULL;
         GLOBAL_STATE->valid_jobs[i] = 0;
@@ -108,6 +120,13 @@ static void generate_work(GlobalState *GLOBAL_STATE, mining_notify *notification
 
     next_job->extranonce2 = strdup(extranonce_2_str);
     next_job->jobid = strdup(notification->job_id);
+    if (next_job->extranonce2 == NULL || next_job->jobid == NULL) {
+        ESP_LOGW(TAG, "Failed to allocate job strings");
+        free(next_job->jobid);
+        free(next_job->extranonce2);
+        free(next_job);
+        return;
+    }
     next_job->version_mask = GLOBAL_STATE->version_mask;
 
     // Check if ASIC is initialized before trying to send work

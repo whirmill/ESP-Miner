@@ -91,7 +91,7 @@ void app_main(void)
     if (xTaskCreateWithCaps(hashrate_monitor_task, "hashrate monitor", ESP_MINER_TASK_STACK_SIZE_SMALL, (void *) &GLOBAL_STATE, 5, NULL, ESP_MINER_TASK_STACK_CAPS) != pdPASS) {
         ESP_LOGE(TAG, "Error creating hashrate monitor task");
     }
-    if (xTaskCreateWithCaps(statistics_task, "statistics", ESP_MINER_TASK_STACK_SIZE_SMALL, (void *) &GLOBAL_STATE, 3, NULL, ESP_MINER_TASK_STACK_CAPS) != pdPASS) {
+    if (xTaskCreateWithCaps(statistics_task, "statistics", ESP_MINER_TASK_STACK_SIZE_TINY, (void *) &GLOBAL_STATE, 3, NULL, ESP_MINER_TASK_STACK_CAPS) != pdPASS) {
         ESP_LOGE(TAG, "Error creating statistics task");
     }
 
@@ -100,7 +100,7 @@ void app_main(void)
     if (xTaskCreateWithCaps(POWER_MANAGEMENT_task, "power management", ESP_MINER_TASK_STACK_SIZE_DEFAULT, (void *) &GLOBAL_STATE, 10, NULL, ESP_MINER_TASK_STACK_CAPS) != pdPASS) {
         ESP_LOGE(TAG, "Error creating power management task");
     }
-    if (xTaskCreate(FAN_CONTROLLER_task, "fan_controller", 8192, (void *) &GLOBAL_STATE, 5, NULL) != pdPASS) {
+    if (xTaskCreateWithCaps(FAN_CONTROLLER_task, "fan_controller", ESP_MINER_TASK_STACK_SIZE_DEFAULT, (void *) &GLOBAL_STATE, 5, NULL, ESP_MINER_TASK_STACK_CAPS) != pdPASS) {
         ESP_LOGE(TAG, "Error creating fan controller task");
     }
 

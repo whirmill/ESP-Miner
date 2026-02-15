@@ -14,7 +14,6 @@
 #include <errno.h>
 #include "utils.h"
 #include "coinbase_decoder.h"
-#include <esp_heap_caps.h>
 
 #include "esp_miner_caps.h"
 
@@ -369,11 +368,8 @@ void stratum_primary_heartbeat(void * pvParameters)
 
 static void decode_mining_notification(GlobalState * GLOBAL_STATE, const mining_notify *mining_notification)
 {
-    mining_notification_result_t *result = heap_caps_malloc(sizeof(mining_notification_result_t), ESP_MINER_HEAP_ALLOC_CAPS);
-    if (!result) {
-        ESP_LOGE(TAG, "Failed to allocate mining notification decode result");
-        return;
-    }
+    static mining_notification_result_t decode_result = {0};
+    mining_notification_result_t *result = &decode_result;
     memset(result, 0, sizeof(mining_notification_result_t));
 
     const char * user = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_user : GLOBAL_STATE->SYSTEM_MODULE.pool_user;
@@ -386,7 +382,7 @@ static void decode_mining_notification(GlobalState * GLOBAL_STATE, const mining_
                                      decode_coinbase,
                                      result) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to process mining notification");
-        free(result);
+        free(result->scriptsig);
         return;
     }
 
@@ -438,7 +434,7 @@ static void decode_mining_notification(GlobalState * GLOBAL_STATE, const mining_
         }
     }
 
-    free(result);
+    result->scriptsig = NULL;
 }
 
 void stratum_task(void * pvParameters)
